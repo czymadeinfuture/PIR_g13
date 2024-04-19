@@ -5,7 +5,7 @@ import time
 import threading
 
 
-taille_carte = 20
+taille_carte = 30
 interval = 1
 
 def init_map(num):
@@ -14,9 +14,10 @@ def init_map(num):
 map = init_map(taille_carte)
 
 colors = {
-    0: "#CCFFCC", 
+    0: "#FFFFFF", 
     1: "#FF0000", 
-    2: "#006400"  
+    2: "#006400",
+    3: "#CCFFCC",
 }
 
 clicked_x = clicked_y = None
