@@ -1,9 +1,8 @@
+import random
+import threading
+import time
 import tkinter as tk
 from functools import partial
-import random
-import time
-import threading
-
 
 taille_carte = 30
 interval = 1
@@ -38,7 +37,7 @@ COLORS = {
     "void": "#FFFFFF",
     "obstacle": "#FF0000",
     "trash": "#000000",
-    "feuillage": "#CCFFCC",
+    "feuillage": "#00B500",
     "tronc": "#8B4513",
 }
 
@@ -56,6 +55,20 @@ def draw_pixel(canvas, x, y, color, pixel_size, tag):
         (y + 1) * pixel_size,
         fill=color,
         outline="black",
+        tags=tag,
+    )
+
+
+def draw_pixel_feuillage(canvas, x, y, color, pixel_size, tag):
+    margin = pixel_size // 6
+    canvas.create_rectangle(
+        x * pixel_size + margin,
+        y * pixel_size + margin,
+        (x + 1) * pixel_size - margin,
+        (y + 1) * pixel_size - margin,
+        fill=color,
+        outline="#00B500",
+        width=5,
         tags=tag,
     )
 
@@ -154,7 +167,7 @@ def change_color(x, y, etage, element):
     elif map[y][x].etage2 != "void" and etage == 1:
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
-        draw_pixel(canvas, x, y, mixed_color(element), pixel_size, tag)
+        draw_pixel_feuillage(canvas, x, y, mixed_color(element), pixel_size, tag)
         print("3")
 
     elif map[y][x].etage1 != "void" and etage == 2:
@@ -162,14 +175,18 @@ def change_color(x, y, etage, element):
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         print(map[y][x].etage1)
-        draw_pixel(canvas, x, y, mixed_color(map[y][x].etage1), pixel_size, tag)
+        draw_pixel_feuillage(
+            canvas, x, y, mixed_color(map[y][x].etage1), pixel_size, tag
+        )
         print("4")
 
 
 def mixed_color(element):
     COLORS = {
-        "trash": "#006400",
-        "obstacle": "#8B0000",
+        "void": "#FFFFFF",
+        "obstacle": "#FF0000",
+        "trash": "#000000",
+        "feuillage": "#00B500",
         "tronc": "#8B4513",
     }
     return COLORS[element]
