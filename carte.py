@@ -13,8 +13,22 @@ canvas_height = 700
 window_size = 200
 
 
+class Cellule:
+    # ajouter class robot et drone qui ne sont pas reliés à la classe cellule
+    def __init__(
+        self,
+        etage1="void",
+        etage2="void",
+        date=None,
+        robot=False,
+        drone=False,
+    ):
+        self.etage1 = etage1
+        self.etage2 = etage2
+
+
 def init_map(num):
-    return [["void" for _ in range(num)] for _ in range(num)]
+    return [[Cellule() for _ in range(num)] for _ in range(num)]
 
 
 map = init_map(taille_carte)
@@ -56,7 +70,7 @@ def draw_map(canvas, window_size):
     pixel_size = 3 * window_size // len(map)
     for y, row in enumerate(map):
         for x, value in enumerate(row):
-            color = COLORS[value]
+            color = COLORS[value.etage1]
             tag = f"pixel{x}-{y}"
             draw_pixel(canvas, x, y, color, pixel_size, tag)
             canvas.tag_bind(
@@ -111,26 +125,71 @@ def on_click(event, x, y):
 ###fonctions de changement
 
 
-def change_color(x, y, element):
-    map[y][x] = element
-    tag = f"pixel{x}-{y}"
-    draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+# def change_color_1(x, y, element):
+#     map[y][x].etage1 = element
+#     tag = f"pixel{x}-{y}"
+#     draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+
+
+# def change_color_2(x, y, element):
+#     map[y][x].etage2 = element
+#     tag = f"pixel{x}-{y}"
+#     draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+
+
+def change_color(x, y, etage, element):
+    if map[y][x].etage2 == "void" and map[y][x].etage1 == "void" and etage == 2:
+        print(x, y)
+        print(map[y][x].etage1)
+        map[y][x].etage2 = element
+        tag = f"pixel{x}-{y}"
+        draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+        print("1")
+    elif map[y][x].etage1 == "void" and map[y][x].etage2 == "void" and etage == 1:
+        map[y][x].etage1 = element
+        tag = f"pixel{x}-{y}"
+        draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+        print("2")
+
+    elif map[y][x].etage2 != "void" and etage == 1:
+        map[y][x].etage1 = element
+        tag = f"pixel{x}-{y}"
+        draw_pixel(canvas, x, y, mixed_color(element), pixel_size, tag)
+        print("3")
+
+    elif map[y][x].etage1 != "void" and etage == 2:
+        print("4")
+        map[y][x].etage2 = element
+        tag = f"pixel{x}-{y}"
+        print(map[y][x].etage1)
+        draw_pixel(canvas, x, y, mixed_color(map[y][x].etage1), pixel_size, tag)
+        print("4")
+
+
+def mixed_color(element):
+    COLORS = {
+        "trash": "#006400",
+        "obstacle": "#8B0000",
+        "tronc": "#8B4513",
+    }
+    return COLORS[element]
 
 
 def change_to_void(x, y):
-    change_color(x, y, "void")
+    change_color(x, y, 1, "void")
+    change_color(x, y, 2, "void")
 
 
 def change_to_trash(x, y):
-    change_color(x, y, "trash")
+    change_color(x, y, 1, "trash")
 
 
 def change_to_obstacle(x, y):
-    change_color(x, y, "obstacle")
+    change_color(x, y, 1, "obstacle")
 
 
 def change_to_leaf(x, y):
-    change_color(x, y, "feuillage")
+    change_color(x, y, 2, "feuillage")
 
 
 def change_to_tree(x, y):
@@ -142,10 +201,9 @@ def change_to_tree(x, y):
                 if 0 <= new_x < len(map[0]) and 0 <= new_y < len(
                     map
                 ):  # Vérifier les limites
-                    if map[new_y][new_x] == "void":
-                        change_color(new_x, new_y, "feuillage")
+                    change_color(new_x, new_y, 2, "feuillage")
 
-    change_color(x, y, "tronc")
+    change_color(x, y, 1, "tronc")
 
 
 ###boutons fonctions avancées
