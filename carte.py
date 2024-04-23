@@ -4,7 +4,7 @@ import time
 import tkinter as tk
 from functools import partial
 
-taille_carte = 30
+taille_carte = 20
 interval = 1
 
 canvas_width = 700
@@ -60,6 +60,7 @@ def draw_pixel(canvas, x, y, color, pixel_size, tag):
 
 
 def draw_pixel_feuillage(canvas, x, y, color, pixel_size, tag):
+    draw_pixel(canvas, x, y, "#00B500", pixel_size, tag)
     margin = pixel_size // 6
     canvas.create_rectangle(
         x * pixel_size + margin,
@@ -67,8 +68,6 @@ def draw_pixel_feuillage(canvas, x, y, color, pixel_size, tag):
         (x + 1) * pixel_size - margin,
         (y + 1) * pixel_size - margin,
         fill=color,
-        outline="#00B500",
-        width=5,
         tags=tag,
     )
 
@@ -135,66 +134,92 @@ def on_click(event, x, y):
     menu.post(event.x_root, event.y_root)
 
 
-###fonctions de changement
+def print_map(map):
+    for row in map:
+        for cell in row:
+            print(f"({cell.etage1}, {cell.etage2})", end=" ")
 
-
-# def change_color_1(x, y, element):
-#     map[y][x].etage1 = element
-#     tag = f"pixel{x}-{y}"
-#     draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
-
-
-# def change_color_2(x, y, element):
-#     map[y][x].etage2 = element
-#     tag = f"pixel{x}-{y}"
-#     draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+        print()  # Newline at the end of each row
+    print("                    ")
 
 
 def change_color(x, y, etage, element):
-    if map[y][x].etage2 == "void" and map[y][x].etage1 == "void" and etage == 2:
-        print(x, y)
-        print(map[y][x].etage1)
+    if map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
+        tag = f"pixel{x}-{y}"
+        map[y][x].etage1 = element
+
+        radius = 2
+        for i in range(-radius, radius + 1):
+            for j in range(-radius, radius + 1):
+                if i**2 + j**2 <= radius**2:  # Condition pour créer un cercle
+                    new_x, new_y = x + i, y + j
+                    if 0 <= new_x < len(map[0]) and 0 <= new_y < len(
+                        map
+                    ):  # Vérifier les limites
+                        tag_new = f"pixel{new_x}-{new_y}"
+                        if map[new_y][new_x].etage1 != "void":
+                            map[new_y][new_x].etage2 = "void"
+                            draw_pixel(
+                                canvas,
+                                new_x,
+                                new_y,
+                                COLORS[map[new_y][new_x].etage1],
+                                pixel_size,
+                                tag_new,
+                            )
+                        else:
+                            map[new_y][new_x].etage2 = "void"
+                            draw_pixel(
+                                canvas,
+                                new_x,
+                                new_y,
+                                COLORS["void"],
+                                pixel_size,
+                                tag_new,
+                            )
+
+        draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+        print_map(map)
+
+    elif map[y][x].etage2 == "void" and map[y][x].etage1 == "void" and etage == 2:
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
-        print("1")
+        print_map(map)
+
     elif map[y][x].etage1 == "void" and map[y][x].etage2 == "void" and etage == 1:
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
-        print("2")
+        print_map(map)
 
-    elif map[y][x].etage2 != "void" and etage == 1:
+    elif map[y][x].etage2 != "void" and etage == 1 and element != "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
-        draw_pixel_feuillage(canvas, x, y, mixed_color(element), pixel_size, tag)
-        print("3")
+        draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
+        print_map(map)
 
     elif map[y][x].etage1 != "void" and etage == 2:
-        print("4")
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
-        print(map[y][x].etage1)
-        draw_pixel_feuillage(
-            canvas, x, y, mixed_color(map[y][x].etage1), pixel_size, tag
-        )
-        print("4")
+        draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
+        print_map(map)
 
+    elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
+        map[y][x].etage1 = element
+        tag = f"pixel{x}-{y}"
+        draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
+        print_map(map)
 
-def mixed_color(element):
-    COLORS = {
-        "void": "#FFFFFF",
-        "obstacle": "#FF0000",
-        "trash": "#000000",
-        "feuillage": "#00B500",
-        "tronc": "#8B4513",
-    }
-    return COLORS[element]
+    elif map[y][x].etage1 != "void" and element == "void":
+        map[y][x].etage1 = element
+        tag = f"pixel{x}-{y}"
+        draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
+        print_map(map)
 
 
 def change_to_void(x, y):
     change_color(x, y, 1, "void")
-    change_color(x, y, 2, "void")
 
 
 def change_to_trash(x, y):
