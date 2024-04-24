@@ -10,7 +10,7 @@ from colorama import Fore, Style
 # initialisation
 ###################################################
 
-taille_carte = 15
+taille_carte = 5
 interval_spawn_dechet = 1
 
 canvas_width = 700
@@ -88,26 +88,25 @@ def draw_map(canvas, window_size):  # dessin de la carte
         for x, value in enumerate(row):
             color = COLORS[value.etage1]
             tag = f"pixel{x}-{y}"
-            draw_pixel(canvas, x, y, color, pixel_size, tag)
+            change_color(x, y, 1, value.etage1)
             canvas.tag_bind(
                 tag, "<Button-1>", lambda event, x=x, y=y: on_click(event, x, y)
             )
 
 
 def select_block(
-    start_x, start_y, end_x, end_y, new_etage1, new_etage2
+    start_x, start_y, end_x, end_y, new_etage1
 ):  # changement d'un block dans la matrice
     for y in range(start_y, end_y + 1):
         for x in range(start_x, end_x + 1):
-            map[y][x].etage1 = new_etage1
-            map[y][x].etage2 = new_etage2
+            change_color(x, y, 1, new_etage1)
 
 
 def select_and_draw(
-    start_x, start_y, end_x, end_y, etage1_value, etage2_value
+    start_x, start_y, end_x, end_y, etage1_value
 ):  # dessin de la carte après un bloc
-    select_block(start_x, start_y, end_x, end_y, etage1_value, etage2_value)
-    draw_map(canvas, window_size)
+    select_block(start_x, start_y, end_x, end_y, etage1_value)
+    # draw_map(canvas, window_size)
 
 
 def creation_bloc(x, y):  # création d'un bloc
@@ -124,15 +123,11 @@ def creation_bloc(x, y):  # création d'un bloc
         menu = tk.Menu(root, tearoff=0)
         menu.add_command(
             label="Changer en obstacle",
-            command=lambda: select_and_draw(
-                start_x, start_y, end_x, end_y, "obstacle", "void"
-            ),
+            command=lambda: select_and_draw(start_x, start_y, end_x, end_y, "obstacle"),
         )
         menu.add_command(
             label="Réinitialiser",
-            command=lambda: select_and_draw(
-                start_x, start_y, end_x, end_y, "void", "void"
-            ),
+            command=lambda: select_and_draw(start_x, start_y, end_x, end_y, "void"),
         )
         menu.post(root.winfo_pointerx(), root.winfo_pointery())
         clicked_x = clicked_y = None
@@ -355,19 +350,22 @@ def bouton(
 root = tk.Tk()
 
 trash_button = bouton("Déchet au hasard", place_random_trash, "black")
-trash_button.pack()
+trash_button.grid(row=0, column=0, sticky="w")
+
 tree_button = bouton("Tronc au hasard", place_random_tree, "green")
-tree_button.pack()
+tree_button.grid(row=1, column=0, sticky="w")
 
 trash_cycle_button = bouton("Déchet fréquents", cycle_trash, "black")
-trash_cycle_button.pack()
+trash_cycle_button.grid(row=2, column=0, sticky="w")
+
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
-tree_button.pack(pady=10)
+tree_button.grid(row=0, column=1, sticky="e")
+
 reset_button = bouton("Réinitialiser", reset_grid, "red")
-reset_button.pack()
+reset_button.grid(row=1, column=1, sticky="e")
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
-canvas.pack()
+canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
 
 canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill="white")
 
