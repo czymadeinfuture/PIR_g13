@@ -4,7 +4,9 @@ import time
 import tkinter as tk
 from functools import partial
 
-taille_carte = 20
+from colorama import Fore, Style
+
+taille_carte = 5
 interval = 1
 
 canvas_width = 700
@@ -72,10 +74,10 @@ def draw_pixel_feuillage(canvas, x, y, color, pixel_size, tag):
     )
 
 
-def select_block(start_x, start_y, end_x, end_y, new_color):
-    for y in range(start_y, end_y + 1):
-        for x in range(start_x, end_x + 1):
-            map[y][x] = new_color
+# def select_block(start_x, start_y, end_x, end_y, new_color):
+#     for y in range(start_y, end_y + 1):
+#         for x in range(start_x, end_x + 1):
+#             map[y][x] = new_color
 
 
 def draw_map(canvas, window_size):
@@ -88,6 +90,18 @@ def draw_map(canvas, window_size):
             canvas.tag_bind(
                 tag, "<Button-1>", lambda event, x=x, y=y: on_click(event, x, y)
             )
+
+
+def select_block(start_x, start_y, end_x, end_y, new_etage1, new_etage2):
+    for y in range(start_y, end_y + 1):
+        for x in range(start_x, end_x + 1):
+            map[y][x].etage1 = new_etage1
+            map[y][x].etage2 = new_etage2
+
+
+def select_and_draw(start_x, start_y, end_x, end_y, etage1_value, etage2_value):
+    select_block(start_x, start_y, end_x, end_y, etage1_value, etage2_value)
+    draw_map(canvas, window_size)
 
 
 def creation_bloc(x, y):
@@ -104,22 +118,18 @@ def creation_bloc(x, y):
         menu = tk.Menu(root, tearoff=0)
         menu.add_command(
             label="Changer en obstacle",
-            command=lambda: select_and_draw(start_x, start_y, end_x, end_y, 1),
+            command=lambda: select_and_draw(
+                start_x, start_y, end_x, end_y, "obstacle", "void"
+            ),
         )
         menu.add_command(
             label="Réinitialiser",
-            command=lambda: select_and_draw(start_x, start_y, end_x, end_y, 0),
+            command=lambda: select_and_draw(
+                start_x, start_y, end_x, end_y, "void", "void"
+            ),
         )
         menu.post(root.winfo_pointerx(), root.winfo_pointery())
         clicked_x = clicked_y = None
-
-
-def select_and_draw(start_x, start_y, end_x, end_y, value):
-    select_block(start_x, start_y, end_x, end_y, value)
-    draw_map(canvas, window_size)
-
-
-###menu contextuel
 
 
 def on_click(event, x, y):
@@ -135,12 +145,27 @@ def on_click(event, x, y):
 
 
 def print_map(map):
+    color_mapping = {
+        "feuillage": Fore.GREEN,
+        "tronc": Fore.YELLOW,
+        "obstacle": Fore.RED,
+        "dechet": Fore.BLUE,
+        "void": Fore.WHITE,
+    }
+    print("Matrice :")
+    print("   ")
     for row in map:
         for cell in row:
-            print(f"({cell.etage1}, {cell.etage2})", end=" ")
+            etage1_color = color_mapping.get(cell.etage1, Fore.RESET)
+            etage2_color = color_mapping.get(cell.etage2, Fore.RESET)
+            print(
+                f"{etage1_color}({cell.etage1}, {etage2_color}{cell.etage2}){Style.RESET_ALL}",
+                end=" ",
+            )
 
         print()  # Newline at the end of each row
-    print("                    ")
+    print("   ")
+    print("   ")
 
 
 def change_color(x, y, etage, element):
@@ -157,9 +182,25 @@ def change_color(x, y, etage, element):
                         map
                     ):  # Vérifier les limites
                         tag_new = f"pixel{new_x}-{new_y}"
-                        if map[new_y][new_x].etage1 != "void":
+                        if (
+                            map[new_y][new_x].etage1 != "void"
+                            and map[new_y][new_x].etage1 != "tronc"
+                        ):
                             map[new_y][new_x].etage2 = "void"
                             draw_pixel(
+                                canvas,
+                                new_x,
+                                new_y,
+                                COLORS[map[new_y][new_x].etage1],
+                                pixel_size,
+                                tag_new,
+                            )
+                        elif (
+                            map[new_y][new_x].etage1 != "void"
+                            and map[new_y][new_x].etage1 == "tronc"
+                        ):
+                            map[new_y][new_x].etage2 = "feuillage"
+                            draw_pixel_feuillage(
                                 canvas,
                                 new_x,
                                 new_y,
@@ -179,43 +220,36 @@ def change_color(x, y, etage, element):
                             )
 
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
-        print_map(map)
 
     elif map[y][x].etage2 == "void" and map[y][x].etage1 == "void" and etage == 2:
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
-        print_map(map)
 
     elif map[y][x].etage1 == "void" and map[y][x].etage2 == "void" and etage == 1:
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
-        print_map(map)
 
     elif map[y][x].etage2 != "void" and etage == 1 and element != "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
-        print_map(map)
 
     elif map[y][x].etage1 != "void" and etage == 2:
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
-        print_map(map)
 
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
-        print_map(map)
 
     elif map[y][x].etage1 != "void" and element == "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
-        print_map(map)
 
 
 def change_to_void(x, y):
@@ -252,7 +286,8 @@ def change_to_tree(x, y):
 def place_random_trash():
     x = random.randint(0, len(map) - 1)
     y = random.randint(0, len(map[0]) - 1)
-    change_to_trash(x, y)
+    if map[y][x].etage1 == "void":
+        change_to_trash(x, y)
 
 
 def place_random_tree():
@@ -293,7 +328,10 @@ trash_button = tk.Button(root, text="Déchet au hasard", command=place_random_tr
 trash_button.pack()
 tree_button = tk.Button(root, text="Tronc au hasard", command=place_random_tree)
 tree_button.pack()
-
+tree_button = tk.Button(
+    root, text="Afficher matrice dans console", command=lambda: print_map(map)
+)
+tree_button.pack()
 trash_cycle_button = tk.Button(root, text="Déchet fréquents", command=cycle_trash)
 trash_cycle_button.pack()
 
