@@ -6,7 +6,7 @@ from functools import partial
 
 from colorama import Fore, Style
 
-taille_carte = 5
+taille_carte = 15
 interval = 1
 
 canvas_width = 700
