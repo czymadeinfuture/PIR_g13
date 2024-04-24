@@ -321,19 +321,30 @@ def cycle_trash():
         cliqued_switch = 0
 
 
+def bouton(nom_bouton, commande_bouton, couleur="green"):
+    return tk.Button(
+        root,
+        text=nom_bouton,
+        command=commande_bouton,
+        fg="white",  # Couleur du texte
+        bg=couleur,  # Couleur de fond
+        font=("Helvetica", 10),  # Police et taille
+    )
+
+
 root = tk.Tk()
-reset_button = tk.Button(root, text="Réinitialiser", command=reset_grid)
-reset_button.pack()
-trash_button = tk.Button(root, text="Déchet au hasard", command=place_random_trash)
+
+trash_button = bouton("Déchet au hasard", place_random_trash, "black")
 trash_button.pack()
-tree_button = tk.Button(root, text="Tronc au hasard", command=place_random_tree)
+tree_button = bouton("Tronc au hasard", place_random_tree, "green")
 tree_button.pack()
-tree_button = tk.Button(
-    root, text="Afficher matrice dans console", command=lambda: print_map(map)
-)
-tree_button.pack()
-trash_cycle_button = tk.Button(root, text="Déchet fréquents", command=cycle_trash)
+
+trash_cycle_button = bouton("Déchet fréquents", cycle_trash, "black")
 trash_cycle_button.pack()
+tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
+tree_button.pack()
+reset_button = bouton("Réinitialiser", reset_grid, "red")
+reset_button.pack()
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.pack()
