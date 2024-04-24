@@ -165,11 +165,9 @@ def change_color(
         radius = 2
         for i in range(-radius, radius + 1):
             for j in range(-radius, radius + 1):
-                if i**2 + j**2 <= radius**2:  # Condition pour créer un cercle
+                if i**2 + j**2 <= radius**2:
                     new_x, new_y = x + i, y + j
-                    if 0 <= new_x < len(map[0]) and 0 <= new_y < len(
-                        map
-                    ):  # Vérifier les limites
+                    if 0 <= new_x < len(map[0]) and 0 <= new_y < len(map):
                         tag_new = f"pixel{new_x}-{new_y}"
                         if (
                             map[new_y][new_x].etage1 != "void"
@@ -261,11 +259,9 @@ def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
     radius = 2
     for i in range(-radius, radius + 1):
         for j in range(-radius, radius + 1):
-            if i**2 + j**2 <= radius**2:  # Condition pour créer un cercle
+            if i**2 + j**2 <= radius**2:
                 new_x, new_y = x + i, y + j
-                if 0 <= new_x < len(map[0]) and 0 <= new_y < len(
-                    map
-                ):  # Vérifier les limites
+                if 0 <= new_x < len(map[0]) and 0 <= new_y < len(map):
                     change_color(new_x, new_y, 2, "feuillage")
 
     change_color(x, y, 1, "tronc")
@@ -295,7 +291,7 @@ def print_map(map):  # affichage de la matrice dans la console
                 end=" ",
             )
 
-        print()  # Newline at the end of each row
+        print()
     print("   ")
     print("   ")
 
@@ -350,9 +346,9 @@ def bouton(
         root,
         text=nom_bouton,
         command=commande_bouton,
-        fg="white",  # Couleur du texte
-        bg=couleur,  # Couleur de fond
-        font=("Helvetica", 10),  # Police et taille
+        fg="white",
+        bg=couleur,
+        font=("Helvetica", 10),
     )
 
 
