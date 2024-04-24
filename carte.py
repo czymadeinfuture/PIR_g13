@@ -342,7 +342,7 @@ tree_button.pack()
 trash_cycle_button = bouton("Déchet fréquents", cycle_trash, "black")
 trash_cycle_button.pack()
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
-tree_button.pack()
+tree_button.pack(pady=10)
 reset_button = bouton("Réinitialiser", reset_grid, "red")
 reset_button.pack()
 
