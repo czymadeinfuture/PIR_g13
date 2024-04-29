@@ -10,7 +10,7 @@ from colorama import Fore, Style
 # initialisation
 ###################################################
 
-taille_carte = 5
+taille_carte = 10
 interval_spawn_dechet = 1
 
 canvas_width = 700
@@ -19,17 +19,31 @@ window_size = 200
 
 
 class Cellule:
-    # ajouter class robot et drone qui ne sont pas reliés à la classe cellule
     def __init__(
         self,
         etage1="void",
         etage2="void",
-        date=None,
+        date=None, # Permettra plus tard de définir la derniere fois que la case a été visitée
         robot=False,
         drone=False,
     ):
         self.etage1 = etage1
         self.etage2 = etage2
+        self.robot = Robot() if robot else None
+        self.drone = Drone() if drone else None
+        
+class Robot:
+    def __init__(self, x=0, y=0, quantite=0, capacite=25):
+        self.x = x # Permettra plus tard les positions relatives dans la cellule sur Gazebo
+        self.y = y
+        self.quantite = quantite # Permettra plus tard de définir le nombre de déchet que le robot a en stock
+        self.capacite = capacite # Permettra plus tard de définir la capacité max de déchet que le robot peut avoir
+
+class Drone:
+    def __init__(self, x=0, y=0, z=0):
+        self.x = x # Permettra plus tard les positions relatives dans la cellule sur Gazebo
+        self.y = y        
+        self.z = z
 
 
 def init_map(num):  # initialisation de la carte
@@ -45,6 +59,8 @@ COLORS = {  # couleurs des cases
     "trash": "#000000",
     "feuillage": "#00B500",
     "tronc": "#8B4513",
+    "robot": "#E4FF00",
+    "drone": "#FFB200",
 }
 
 
@@ -80,6 +96,20 @@ def draw_pixel_feuillage(
         fill=color,
         tags=tag,
     )
+    
+def draw_pixel_drone(
+    canvas, x, y, color, pixel_size, tag
+):  # dessin d'un pixel sous un drone
+    draw_pixel(canvas, x, y, "#FFB200", pixel_size, tag)
+    margin = pixel_size // 6
+    canvas.create_rectangle(
+        x * pixel_size + margin,
+        y * pixel_size + margin,
+        (x + 1) * pixel_size - margin,
+        (y + 1) * pixel_size - margin,
+        fill=color,
+        tags=tag,
+    )    
 
 
 def draw_map(canvas, window_size):  # dessin de la carte
@@ -145,6 +175,8 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
     )
     menu.add_command(label="Changer en arbre", command=partial(change_to_tree, x, y))
     menu.add_command(label="Changer en déchet", command=partial(change_to_trash, x, y))
+    menu.add_command(label="Changer en robot", command=partial(change_to_robot, x, y))
+    menu.add_command(label="Changer en drone", command=partial(change_to_drone, x, y))
     menu.add_command(label="Réinitialiser", command=partial(change_to_void, x, y))
     menu.add_command(label="Faire un bloc", command=partial(creation_bloc, x, y))
     menu.post(event.x_root, event.y_root)
@@ -189,7 +221,7 @@ def change_color(
                                 COLORS[map[new_y][new_x].etage1],
                                 pixel_size,
                                 tag_new,
-                            )
+                            )   
                         else:
                             map[new_y][new_x].etage2 = "void"
                             draw_pixel(
@@ -200,7 +232,6 @@ def change_color(
                                 pixel_size,
                                 tag_new,
                             )
-
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
 
     elif map[y][x].etage2 == "void" and map[y][x].etage1 == "void" and etage == 2:
@@ -216,12 +247,19 @@ def change_color(
     elif map[y][x].etage2 != "void" and etage == 1 and element != "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
-        draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
+        if map[y][x].etage2 == "drone":
+            draw_pixel_drone(canvas, x, y, COLORS[element], pixel_size, tag)
+        else:    
+            draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
 
     elif map[y][x].etage1 != "void" and etage == 2:
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
-        draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
+        if map[y][x].etage2 == "drone":
+            draw_pixel_drone(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
+        else:    
+            draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
+
 
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
         map[y][x].etage1 = element
@@ -240,7 +278,12 @@ def change_to_void(x, y):  # changement d'un pixel en void
 
 def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
+    
+def change_to_robot(x, y):  # changement d'un pixel en robot
+    change_color(x, y, 1, "robot")
 
+def change_to_drone(x, y):  # changement d'un pixel en drone
+    change_color(x, y, 2, "drone")
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
     change_color(x, y, 1, "obstacle")
@@ -270,10 +313,12 @@ def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
 def print_map(map):  # affichage de la matrice dans la console
     color_mapping = {
         "feuillage": Fore.GREEN,
-        "tronc": Fore.YELLOW,
+        "tronc": Fore.BLACK,
         "obstacle": Fore.RED,
         "dechet": Fore.BLUE,
         "void": Fore.WHITE,
+        "robot": Fore.YELLOW,
+        "drone": Fore.MAGENTA,
     }
     print("Matrice :")
     print("   ")
