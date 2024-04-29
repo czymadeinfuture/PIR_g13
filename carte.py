@@ -269,6 +269,11 @@ def change_color(
             draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
 
 
+    elif map[y][x].etage2 == "feuillage" and etage == 1 and element == "void":
+        map[y][x].etage1 = element
+        tag = f"pixel{x}-{y}"
+        draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
+
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
         map[y][x].etage1 = element
         map[y][x].etage2 = element
@@ -283,7 +288,6 @@ def change_color(
 
 def change_to_void(x, y):  # changement d'un pixel en void
     change_color(x, y, 1, "void")
-    change_color(x, y, 2, "void")
 
 
 def change_to_trash(x, y):  # changement d'un pixel en déchet
