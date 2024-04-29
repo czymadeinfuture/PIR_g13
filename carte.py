@@ -23,7 +23,7 @@ class Cellule:
         self,
         etage1="void",
         etage2="void",
-        date=None,  # Permettra plus tard de definir la derniere fois que la case a été visitee
+        date=None,  # Permettra plus tard de definir la derniere fois que la case a ete visitee
         robot=False,
         drone=False,
     ):
@@ -31,12 +31,12 @@ class Cellule:
         self.etage2 = etage2
         self.robot = Robot() if robot else None
         self.drone = Drone() if drone else None
-
-
+    
+        
 class Robot:
     def __init__(self, x=0, y=0, quantite=0, capacite=25):
-        self.x = (
-            x  # Permettra plus tard les positions relatives dans la cellule sur Gazebo
+        self.x = ( 
+                  x  # Permettra plus tard les positions relatives dans la cellule sur Gazebo
         )
         self.y = y
         self.quantite = quantite  # Permettra plus tard de définir le nombre de déchet que le robot a en stock
@@ -48,7 +48,7 @@ class Drone:
         self.x = (
             x  # Permettra plus tard les positions relatives dans la cellule sur Gazebo
         )
-        self.y = y
+        self.y = y        
         self.z = z
 
 
@@ -102,8 +102,8 @@ def draw_pixel_feuillage(
         fill=color,
         tags=tag,
     )
-
-
+    
+    
 def draw_pixel_drone(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un drone
@@ -116,7 +116,7 @@ def draw_pixel_drone(
         (y + 1) * pixel_size - margin,
         fill=color,
         tags=tag,
-    )
+    )    
 
 
 def draw_map(canvas, window_size):  # dessin de la carte
@@ -186,7 +186,7 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
     menu.add_command(label="Changer en drone", command=partial(change_to_drone, x, y))
     menu.add_command(label="Réinitialiser", command=partial(change_to_void, x, y))
     menu.add_command(label="Faire un bloc", command=partial(creation_bloc, x, y))
-
+    
     menu.tk_popup(event.x_root, event.y_root)
 
 
@@ -229,7 +229,7 @@ def change_color(
                                 COLORS[map[new_y][new_x].etage1],
                                 pixel_size,
                                 tag_new,
-                            )
+                            )   
                         else:
                             map[new_y][new_x].etage2 = "void"
                             draw_pixel(
@@ -257,7 +257,7 @@ def change_color(
         tag = f"pixel{x}-{y}"
         if map[y][x].etage2 == "drone":
             draw_pixel_drone(canvas, x, y, COLORS[element], pixel_size, tag)
-        else:
+        else:    
             draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
 
     elif map[y][x].etage1 != "void" and etage == 2:
@@ -265,15 +265,15 @@ def change_color(
         tag = f"pixel{x}-{y}"
         if map[y][x].etage2 == "drone":
             draw_pixel_drone(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
-        else:
-            draw_pixel_feuillage(
-                canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag
-            )
+        else:    
+            draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
+
 
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
         map[y][x].etage1 = element
+        map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
-        draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
+        draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
 
     elif map[y][x].etage1 != "void" and element == "void":
         map[y][x].etage1 = element
@@ -283,19 +283,17 @@ def change_color(
 
 def change_to_void(x, y):  # changement d'un pixel en void
     change_color(x, y, 1, "void")
+    change_color(x, y, 2, "void")
 
 
 def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
-
-
+    
 def change_to_robot(x, y):  # changement d'un pixel en robot
     change_color(x, y, 1, "robot")
 
-
 def change_to_drone(x, y):  # changement d'un pixel en drone
     change_color(x, y, 2, "drone")
-
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
     change_color(x, y, 1, "obstacle")
