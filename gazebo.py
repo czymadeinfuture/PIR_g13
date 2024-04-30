@@ -10,9 +10,6 @@ import subprocess
 
 
 def function1():
-    # os.system(
-    #     "cd ~/catkin_ws && catkin build && source devel/setup.bash && roslaunch gazebo_project trash.launch drone_name:=trash_5 x:=5 y:=3"
-    # )
     command = "cd ~/catkin_ws && catkin build && source devel/setup.bash && roslaunch gazebo_project trash.launch drone_name:=trash_5 x:=5 y:=3"
     subprocess.run(command, shell=True, executable="/bin/bash")
 
