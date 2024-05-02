@@ -193,7 +193,14 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
 def change_color(
     x, y, etage, element
 ):  # changement de couleur d'un pixel, en fonction des elements des étages
-    if map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
+    
+    if (map[y][x].etage1 == "tronc" or map[y][x].etage1 == "obstacle") and etage == 1 and element == "robot":
+        print("Impossible de poser un robot ici: obstacle bloquant") 
+        
+    elif map[y][x].etage2 == "feuillage" and etage == 2 and element == "drone":
+        print("Impossible de poser un drone ici: feuillage bloquant")     
+    
+    elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
         tag = f"pixel{x}-{y}"
         map[y][x].etage1 = element
 
@@ -269,11 +276,7 @@ def change_color(
             draw_pixel_feuillage(
                 canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag
             )
-
-    elif map[y][x].etage2 == "feuillage" and etage == 1 and element == "void":
-        map[y][x].etage1 = element
-        tag = f"pixel{x}-{y}"
-        draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
+    
 
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
         map[y][x].etage1 = element
