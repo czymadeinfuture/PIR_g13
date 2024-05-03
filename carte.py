@@ -76,8 +76,11 @@ COLORS = {  # couleurs des cases
 
 
 def gazebo(type_obj, y, x, number):
-    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{number} x:={x} y:={y}"
-    subprocess.run(command, shell=True, executable="/bin/bash")
+    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"
+    try:
+        subprocess.Popen(command, shell=True, executable="/bin/bash")
+    except Exception as e:
+        print(f"Failed to launch Gazebo: {e}")
 
 
 ###################################################
@@ -117,9 +120,8 @@ def draw_pixel_feuillage(
 def draw_pixel_drone(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un drone
-    draw_pixel(canvas, x, y, "#FFB200", pixel_size, tag)
-    margin = pixel_size // 6
-    canvas.create_rectangle(
+    margin = pixel_size // 3
+    canvas.create_oval(
         x * pixel_size + margin,
         y * pixel_size + margin,
         (x + 1) * pixel_size - margin,
@@ -194,30 +196,86 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
     menu.add_command(label="Changer en déchet", command=partial(change_to_trash, x, y))
     menu.add_command(label="Changer en robot", command=partial(change_to_robot, x, y))
     menu.add_command(label="Changer en drone", command=partial(change_to_drone, x, y))
+    menu.add_command(label="Retirer drone", command=partial(retirer_drone, x, y))
     menu.add_command(label="Réinitialiser", command=partial(change_to_void, x, y))
     menu.add_command(label="Faire un bloc", command=partial(creation_bloc, x, y))
-
+    menu.add_command(
+        label="Test animation", command=partial(animate_drone_move, x, y, 0, 0)
+    )
     menu.tk_popup(event.x_root, event.y_root)
+
+
+def retirer_drone(x, y):
+    if map[y][x].drone is not None:
+        map[y][x].drone = None
+        change_color(x, y, 1, map[y][x].etage1)
+        if map[y][x].etage2 != "void":
+            draw_pixel_feuillage(
+                canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
+            )
+
+
+def animate_drone_move_step(i, old_x, old_y, new_x, new_y, steps=1000):
+    # Calculer le pas pour x et y
+    dx = (new_x - old_x) / steps
+    dy = (new_y - old_y) / steps
+
+    # Calculer la nouvelle position
+    x = old_x + dx * i
+    y = old_y + dy * i
+
+    # Supprimer le cercle à l'ancienne position
+    if i > 0:  # Ne pas supprimer à la première étape
+        previous_x = old_x + dx * (i - 1)
+        previous_y = old_y + dy * (i - 1)
+        retirer_drone(round(previous_x), round(previous_y))
+
+    # Dessiner le cercle à la nouvelle position
+    draw_pixel_drone(
+        canvas,
+        round(x),
+        round(y),
+        COLORS["drone"],
+        pixel_size,
+        f"pixel{round(x)}-{round(y)}",
+    )
+
+    # Mettre à jour la position du drone dans la carte
+    map[round(y)][round(x)].drone = Drone(round(x), round(y))
+
+    if i < steps:
+        # Appeler la prochaine étape de l'animation après un délai
+        canvas.after(
+            20, animate_drone_move_step, i + 1, old_x, old_y, new_x, new_y, steps
+        )
+    else:
+        # Supprimer le cercle à l'ancienne position finale
+        retirer_drone(round(old_x), round(old_y))
+        # Dessiner le cercle à la nouvelle position finale
+        draw_pixel_drone(
+            canvas, new_x, new_y, COLORS["drone"], pixel_size, f"pixel{new_x}-{new_y}"
+        )
+
+        # Mettre à jour la position du drone dans la carte finale
+        map[new_y][new_x].drone = Drone(new_x, new_y)
+
+
+def animate_drone_move(old_x, old_y, new_x, new_y, steps=1000):
+    animate_drone_move_step(0, old_x, old_y, new_x, new_y, steps)
 
 
 def change_color(
     x, y, etage, element
 ):  # changement de couleur d'un pixel, en fonction des elements des étages
-    if (
-        (map[y][x].etage1 == "tronc" or map[y][x].etage1 == "obstacle")
-        and etage == 1
-        and element == "robot"
-    ):
-        print("Impossible de poser un robot ici: obstacle bloquant")
-
-    elif map[y][x].etage2 == "feuillage" and etage == 2 and element == "drone":
-        print("Impossible de poser un drone ici: feuillage bloquant")
+    if element == "drone":
+        draw_pixel_drone(canvas, x, y, COLORS["drone"], pixel_size, f"pixel{x}-{y}")
+        map[y][x].drone = Drone(x, y)
 
     elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
         tag = f"pixel{x}-{y}"
         map[y][x].etage1 = element
 
-        radius = 2
+        radius = 5
         for i in range(-radius, radius + 1):
             for j in range(-radius, radius + 1):
                 if i**2 + j**2 <= radius**2:
@@ -237,6 +295,16 @@ def change_color(
                                 pixel_size,
                                 tag_new,
                             )
+                            if map[new_y][new_x].drone is not None:
+                                draw_pixel_drone(
+                                    canvas,
+                                    new_x,
+                                    new_y,
+                                    COLORS["drone"],
+                                    pixel_size,
+                                    f"pixel{new_x}-{new_y}",
+                                )
+
                         elif (
                             map[new_y][new_x].etage1 != "void"
                             and map[new_y][new_x].etage1 == "tronc"
@@ -250,6 +318,15 @@ def change_color(
                                 pixel_size,
                                 tag_new,
                             )
+                            if map[new_y][new_x].drone is not None:
+                                draw_pixel_drone(
+                                    canvas,
+                                    new_x,
+                                    new_y,
+                                    COLORS["drone"],
+                                    pixel_size,
+                                    f"pixel{new_x}-{new_y}",
+                                )
                         else:
                             map[new_y][new_x].etage2 = "void"
                             draw_pixel(
@@ -260,34 +337,77 @@ def change_color(
                                 pixel_size,
                                 tag_new,
                             )
+                            if map[new_y][new_x].drone is not None:
+                                draw_pixel_drone(
+                                    canvas,
+                                    new_x,
+                                    new_y,
+                                    COLORS["drone"],
+                                    pixel_size,
+                                    f"pixel{new_x}-{new_y}",
+                                )
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
 
-    elif map[y][x].etage2 == "void" and map[y][x].etage1 == "void" and etage == 2:
+    elif (
+        map[y][x].etage2 == "void"
+        and map[y][x].etage1 == "void"
+        and etage == 2
+        and element != "drone"
+    ):
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
     elif map[y][x].etage1 == "void" and map[y][x].etage2 == "void" and etage == 1:
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
     elif map[y][x].etage2 != "void" and etage == 1 and element != "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
-        if map[y][x].etage2 == "drone":
-            draw_pixel_drone(canvas, x, y, COLORS[element], pixel_size, tag)
-        else:
-            draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
+        draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
     elif map[y][x].etage1 != "void" and etage == 2:
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
-        if map[y][x].etage2 == "drone":
-            draw_pixel_drone(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
-        else:
-            draw_pixel_feuillage(
-                canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag
+
+        draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
             )
 
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
@@ -295,11 +415,29 @@ def change_color(
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
     elif map[y][x].etage1 != "void" and element == "void":
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
 
 def change_to_void(x, y):  # changement d'un pixel en void
@@ -321,7 +459,7 @@ def change_to_robot(x, y):  # changement d'un pixel en robot
 
 
 def change_to_drone(x, y):  # changement d'un pixel en drone
-    change_color(x, y, 2, "drone")
+    change_color(x, y, 3, "drone")
 
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
@@ -336,7 +474,7 @@ number_tree = 0
 
 
 def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
-    radius = 2
+    radius = 4
     global number_tree
     for i in range(-radius, radius + 1):
         for j in range(-radius, radius + 1):
@@ -346,6 +484,7 @@ def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
                     change_color(new_x, new_y, 2, "feuillage")
 
     change_color(x, y, 1, "tronc")
+
     gazebo("tree", x, y, number_tree)
     number_tree += 1
 
