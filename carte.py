@@ -1,4 +1,5 @@
 import random
+import subprocess
 import threading
 import time
 import tkinter as tk
@@ -10,7 +11,7 @@ from colorama import Fore, Style
 # initialisation
 ###################################################
 
-taille_carte = 10
+taille_carte = 20
 interval_spawn_dechet = 1
 
 canvas_width = 700
@@ -68,6 +69,15 @@ COLORS = {  # couleurs des cases
     "robot": "#E4FF00",
     "drone": "#FFB200",
 }
+
+###################################################
+###Gazebo
+###################################################
+
+
+def gazebo(type_obj, y, x, number):
+    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{number} x:={x} y:={y}"
+    subprocess.run(command, shell=True, executable="/bin/bash")
 
 
 ###################################################
@@ -193,13 +203,16 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
 def change_color(
     x, y, etage, element
 ):  # changement de couleur d'un pixel, en fonction des elements des étages
-    
-    if (map[y][x].etage1 == "tronc" or map[y][x].etage1 == "obstacle") and etage == 1 and element == "robot":
-        print("Impossible de poser un robot ici: obstacle bloquant") 
-        
+    if (
+        (map[y][x].etage1 == "tronc" or map[y][x].etage1 == "obstacle")
+        and etage == 1
+        and element == "robot"
+    ):
+        print("Impossible de poser un robot ici: obstacle bloquant")
+
     elif map[y][x].etage2 == "feuillage" and etage == 2 and element == "drone":
-        print("Impossible de poser un drone ici: feuillage bloquant")     
-    
+        print("Impossible de poser un drone ici: feuillage bloquant")
+
     elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
         tag = f"pixel{x}-{y}"
         map[y][x].etage1 = element
@@ -276,7 +289,6 @@ def change_color(
             draw_pixel_feuillage(
                 canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag
             )
-    
 
     elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
         map[y][x].etage1 = element
@@ -294,8 +306,14 @@ def change_to_void(x, y):  # changement d'un pixel en void
     change_color(x, y, 1, "void")
 
 
+number_trash = 0
+
+
 def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
+    global number_trash
+    gazebo("trash", x, y, number_trash)
+    number_trash += 1
 
 
 def change_to_robot(x, y):  # changement d'un pixel en robot
@@ -314,8 +332,12 @@ def change_to_leaf(x, y):  # changement d'un pixel en feuillage
     change_color(x, y, 2, "feuillage")
 
 
+number_tree = 0
+
+
 def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
     radius = 2
+    global number_tree
     for i in range(-radius, radius + 1):
         for j in range(-radius, radius + 1):
             if i**2 + j**2 <= radius**2:
@@ -324,6 +346,8 @@ def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
                     change_color(new_x, new_y, 2, "feuillage")
 
     change_color(x, y, 1, "tronc")
+    gazebo("tree", x, y, number_tree)
+    number_tree += 1
 
 
 ###################################################
