@@ -4,6 +4,11 @@ import threading
 import time
 import tkinter as tk
 from functools import partial
+import tkinter.simpledialog as sd
+import tkinter as tk
+from tkinter.simpledialog import Dialog
+import math
+
 
 from colorama import Fore, Style
 
@@ -76,11 +81,20 @@ COLORS = {  # couleurs des cases
 
 
 def gazebo(type_obj, y, x, number):
-    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"
+    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
     try:
         subprocess.Popen(command, shell=True, executable="/bin/bash")
     except Exception as e:
         print(f"Failed to launch Gazebo: {e}")
+
+
+def gazebo_delete(type_obj, y, x, number):
+    command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
+    print(command)
+    try:
+        subprocess.Popen(command, shell=True, executable="/bin/bash")
+    except Exception as e:
+        print(f"Failed to delete Gazebo model: {e}")
 
 
 ###################################################
@@ -189,20 +203,59 @@ def creation_bloc(x, y):  # création d'un bloc
 
 def on_click(event, x, y):  # menu contextuel au clic sur un pixel
     menu = tk.Menu(root, tearoff=0)
-    menu.add_command(
+
+    change_menu = tk.Menu(menu, tearoff=0)
+    change_menu.add_command(
         label="Changer en obstacle", command=partial(change_to_obstacle, x, y)
     )
-    menu.add_command(label="Changer en arbre", command=partial(change_to_tree, x, y))
-    menu.add_command(label="Changer en déchet", command=partial(change_to_trash, x, y))
-    menu.add_command(label="Changer en robot", command=partial(change_to_robot, x, y))
-    menu.add_command(label="Changer en drone", command=partial(change_to_drone, x, y))
-    menu.add_command(label="Retirer drone", command=partial(retirer_drone, x, y))
-    menu.add_command(label="Réinitialiser", command=partial(change_to_void, x, y))
-    menu.add_command(label="Faire un bloc", command=partial(creation_bloc, x, y))
-    menu.add_command(
-        label="Test animation", command=partial(animate_drone_move, x, y, 0, 0)
+    change_menu.add_command(
+        label="Changer en arbre", command=partial(change_to_tree, x, y)
     )
+    change_menu.add_command(
+        label="Changer en déchet", command=partial(change_to_trash, x, y)
+    )
+
+    robot_menu = tk.Menu(menu, tearoff=0)
+    robot_menu.add_command(
+        label="Placer un robot", command=partial(change_to_robot, x, y)
+    )
+    robot_menu.add_command(
+        label="Placer un drone", command=partial(change_to_drone, x, y)
+    )
+    robot_menu.add_command(
+        label="Déplacer drone", command=partial(animate_drone_move, x, y)
+    )
+    robot_menu.add_command(label="Retirer drone", command=partial(retirer_drone, x, y))
+
+    menu.add_cascade(label="Changer en", menu=change_menu)
+    menu.add_cascade(label="Robots", menu=robot_menu)
+
+    menu.add_command(label="Supprimer", command=partial(change_to_void, x, y))
+    menu.add_command(label="Faire un bloc", command=partial(creation_bloc, x, y))
+
     menu.tk_popup(event.x_root, event.y_root)
+
+
+class CoordinateDialog(Dialog):
+    def body(self, master):
+        tk.Label(master, text="x:").grid(row=0)
+        tk.Label(master, text="y:").grid(row=1)
+
+        self.x_entry = tk.Entry(master)
+        self.y_entry = tk.Entry(master)
+
+        self.x_entry.grid(row=0, column=1)
+        self.y_entry.grid(row=1, column=1)
+
+        return self.x_entry  # initial focus
+
+    def apply(self):
+        self.result = (int(self.x_entry.get()), int(self.y_entry.get()))
+
+
+def ask_for_coordinates():
+    dialog = CoordinateDialog(root)
+    return dialog.result
 
 
 def retirer_drone(x, y):
@@ -215,7 +268,11 @@ def retirer_drone(x, y):
             )
 
 
-def animate_drone_move_step(i, old_x, old_y, new_x, new_y, steps=1000):
+def animate_drone_move_step(i, old_x, old_y, new_x, new_y, line=None):
+    # Calculer la distance entre les anciennes et les nouvelles coordonnées
+    distance = math.sqrt((new_x - old_x) ** 2 + (new_y - old_y) ** 2)
+    steps = int(distance) * 10
+
     # Calculer le pas pour x et y
     dx = (new_x - old_x) / steps
     dy = (new_y - old_y) / steps
@@ -246,22 +303,32 @@ def animate_drone_move_step(i, old_x, old_y, new_x, new_y, steps=1000):
     if i < steps:
         # Appeler la prochaine étape de l'animation après un délai
         canvas.after(
-            20, animate_drone_move_step, i + 1, old_x, old_y, new_x, new_y, steps
+            20,
+            animate_drone_move_step,
+            i + 1,
+            old_x,
+            old_y,
+            new_x,
+            new_y,
+            line,
         )
     else:
-        # Supprimer le cercle à l'ancienne position finale
-        retirer_drone(round(old_x), round(old_y))
-        # Dessiner le cercle à la nouvelle position finale
-        draw_pixel_drone(
-            canvas, new_x, new_y, COLORS["drone"], pixel_size, f"pixel{new_x}-{new_y}"
-        )
+        # Dessiner la ligne entre les anciennes et nouvelles coordonnées à la fin de l'animation
+        if line is None:
+            line = canvas.create_line(
+                (1 / 2 + old_x) * pixel_size,
+                (1 / 2 + old_y) * pixel_size,
+                (1 / 2 + new_x) * pixel_size,
+                (1 / 2 + new_y) * pixel_size,
+                fill=COLORS["drone"],
+            )
 
-        # Mettre à jour la position du drone dans la carte finale
-        map[new_y][new_x].drone = Drone(new_x, new_y)
 
-
-def animate_drone_move(old_x, old_y, new_x, new_y, steps=1000):
-    animate_drone_move_step(0, old_x, old_y, new_x, new_y, steps)
+def animate_drone_move(x, y):
+    coordinates = ask_for_coordinates()
+    if coordinates is not None:
+        new_x, new_y = coordinates
+        animate_drone_move_step(0, x, y, new_x, new_y)
 
 
 def change_color(
@@ -272,6 +339,7 @@ def change_color(
         map[y][x].drone = Drone(x, y)
 
     elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
+        gazebo_delete("tree", x, y, 0)
         tag = f"pixel{x}-{y}"
         map[y][x].etage1 = element
 

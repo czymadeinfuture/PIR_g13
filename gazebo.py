@@ -8,7 +8,7 @@ def function1():
 
 
 def function2():
-    command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{model_name: trash_5}'"
+    command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{model_name: trash_5}'"  # noqa: E501
     subprocess.run(command, shell=True, executable="/bin/bash")
 
 
