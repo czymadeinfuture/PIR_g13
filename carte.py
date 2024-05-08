@@ -8,8 +8,10 @@ import tkinter.simpledialog as sd
 import tkinter as tk
 from tkinter.simpledialog import Dialog
 import math
+import pulp
+import numpy as np
 
-
+from geopy import distance as dis
 from colorama import Fore, Style
 
 ###################################################
@@ -75,6 +77,66 @@ COLORS = {  # couleurs des cases
     "drone": "#FFB200",
 }
 
+###################################################
+### mTSP
+###################################################
+        
+def mTSP():
+    indices_dechets=[] 
+    indices_robots=[]
+    trajet=[]
+    
+    for i in range(taille_carte):
+        for j in range(taille_carte):
+             if map[i][j].etage1=="robot":
+                 indices_robots.append((i,j))   
+                 trajet.append((i,j))
+    for i in range(taille_carte):
+        for j in range(taille_carte):
+             if map[i][j].etage1=="trash": # Si la cellule contient des déchets
+                 indices_dechets.append((i, j))  # Enregistrer l'indice de la cellule
+                 trajet.append((i,j))             
+    if(len(indices_dechets)>=2 and len(indices_robots)>=1):
+        ################################################
+        # Building distance matrix
+        ################################################
+        n = len(trajet)
+        C = np.zeros((n,n))
+        print(len(trajet))
+        for i in range(0, n):
+            for j in range(0, len(trajet)):
+                C[i,j] = dis.distance(trajet[i], trajet[j]).m
+                
+        distance_matrix = np.array(C)        
+        num_robots = len(indices_robots)
+        num_debris = len(indices_dechets)
+        print(num_robots)
+        print(num_debris)
+        # Création du problème
+        prob = pulp.LpProblem("mTSP", pulp.LpMinimize)
+
+        # Déclaration des variables
+        x = pulp.LpVariable.dicts("x", [(i, j) for i in range(num_robots) for j in range(num_robots,len(trajet))], 
+                                    cat='Binary')
+
+        # Fonction objectif
+        prob += pulp.lpSum(distance_matrix[i, j] * x[(i, j)] for i in range(num_robots) for j in range(num_robots,len(trajet)))
+
+        # Contraintes
+        for j in range(num_robots,len(trajet)):
+            prob += pulp.lpSum(x[(i, j)] for i in range(num_robots)) == 1  # Chaque déchet est attribué à exactement un robot
+
+        # Résolution
+        prob.solve()
+
+        # Affichage de la solution
+        for i in range(num_robots):
+            print(f"Chemin pour le robot {i+1}:")
+            for j in range(num_robots,len(trajet)):
+                if pulp.value(x[(i, j)]) == 1:
+                    print(f"Déchet {j+1-num_robots}")
+
+        print("Distance totale minimale parcourue par tous les robots :", pulp.value(prob.objective))
 ###################################################
 ###Gazebo
 ###################################################
@@ -519,6 +581,7 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
     global number_trash
     gazebo("trash", x, y, number_trash)
+    mTSP()
     number_trash += 1
 
 
