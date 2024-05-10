@@ -80,7 +80,7 @@ COLORS = {  # couleurs des cases
 ###################################################
 
 
-def gazebo(type_obj, y, x, number):
+def gazebo(type_obj, y, x):
     command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
     try:
         subprocess.Popen(command, shell=True, executable="/bin/bash")
@@ -88,7 +88,16 @@ def gazebo(type_obj, y, x, number):
         print(f"Failed to launch Gazebo: {e}")
 
 
-def gazebo_delete(type_obj, y, x, number):
+def gazebo_delete(type_obj, y, x):
+    command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
+    print(command)
+    try:
+        subprocess.Popen(command, shell=True, executable="/bin/bash")
+    except Exception as e:
+        print(f"Failed to delete Gazebo model: {e}")
+
+
+def gazebo_deplacer(type_obj, y, x):
     command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
     print(command)
     try:
@@ -217,20 +226,24 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
 
     robot_menu = tk.Menu(menu, tearoff=0)
     robot_menu.add_command(
-        label="Placer un robot", command=partial(change_to_robot, x, y)
+        label="Placer un drone", command=partial(change_to_robot, x, y)
     )
     robot_menu.add_command(
-        label="Placer un drone", command=partial(change_to_drone, x, y)
+        label="Placer un robot", command=partial(change_to_drone, x, y)
     )
-    robot_menu.add_command(
-        label="Déplacer drone", command=partial(animate_drone_move, x, y)
-    )
-    robot_menu.add_command(label="Retirer drone", command=partial(retirer_drone, x, y))
+    if map[y][x].drone is not None:
+        robot_menu.add_command(
+            label="Déplacer robot", command=partial(animate_drone_move, x, y)
+        )
+        robot_menu.add_command(
+            label="Retirer robot", command=partial(retirer_drone, x, y)
+        )
 
     menu.add_cascade(label="Changer en", menu=change_menu)
     menu.add_cascade(label="Robots", menu=robot_menu)
+    if map[y][x].etage1 != "void":
+        menu.add_command(label="Supprimer", command=partial(change_to_void, x, y))
 
-    menu.add_command(label="Supprimer", command=partial(change_to_void, x, y))
     menu.add_command(label="Faire un bloc", command=partial(creation_bloc, x, y))
 
     menu.tk_popup(event.x_root, event.y_root)
@@ -261,6 +274,7 @@ def ask_for_coordinates():
 def retirer_drone(x, y):
     if map[y][x].drone is not None:
         map[y][x].drone = None
+        gazebo_delete("warthog", x, y)
         change_color(x, y, 1, map[y][x].etage1)
         if map[y][x].etage2 != "void":
             draw_pixel_feuillage(
@@ -269,25 +283,19 @@ def retirer_drone(x, y):
 
 
 def animate_drone_move_step(i, old_x, old_y, new_x, new_y, line=None):
-    # Calculer la distance entre les anciennes et les nouvelles coordonnées
     distance = math.sqrt((new_x - old_x) ** 2 + (new_y - old_y) ** 2)
     steps = int(distance) * 10
 
-    # Calculer le pas pour x et y
     dx = (new_x - old_x) / steps
     dy = (new_y - old_y) / steps
 
-    # Calculer la nouvelle position
     x = old_x + dx * i
     y = old_y + dy * i
 
-    # Supprimer le cercle à l'ancienne position
-    if i > 0:  # Ne pas supprimer à la première étape
-        previous_x = old_x + dx * (i - 1)
-        previous_y = old_y + dy * (i - 1)
-        retirer_drone(round(previous_x), round(previous_y))
+    previous_x = old_x + dx * (i - 1)
+    previous_y = old_y + dy * (i - 1)
+    retirer_drone(round(previous_x), round(previous_y))
 
-    # Dessiner le cercle à la nouvelle position
     draw_pixel_drone(
         canvas,
         round(x),
@@ -297,11 +305,9 @@ def animate_drone_move_step(i, old_x, old_y, new_x, new_y, line=None):
         f"pixel{round(x)}-{round(y)}",
     )
 
-    # Mettre à jour la position du drone dans la carte
     map[round(y)][round(x)].drone = Drone(round(x), round(y))
 
     if i < steps:
-        # Appeler la prochaine étape de l'animation après un délai
         canvas.after(
             20,
             animate_drone_move_step,
@@ -313,7 +319,6 @@ def animate_drone_move_step(i, old_x, old_y, new_x, new_y, line=None):
             line,
         )
     else:
-        # Dessiner la ligne entre les anciennes et nouvelles coordonnées à la fin de l'animation
         if line is None:
             line = canvas.create_line(
                 (1 / 2 + old_x) * pixel_size,
@@ -331,15 +336,13 @@ def animate_drone_move(x, y):
         animate_drone_move_step(0, x, y, new_x, new_y)
 
 
-def change_color(
-    x, y, etage, element
-):  # changement de couleur d'un pixel, en fonction des elements des étages
+def change_color(x, y, etage, element):
     if element == "drone":
         draw_pixel_drone(canvas, x, y, COLORS["drone"], pixel_size, f"pixel{x}-{y}")
         map[y][x].drone = Drone(x, y)
 
     elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
-        gazebo_delete("tree", x, y, 0)
+        gazebo_delete("tree", x, y)
         tag = f"pixel{x}-{y}"
         map[y][x].etage1 = element
 
@@ -483,6 +486,7 @@ def change_color(
         map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
+
         if map[y][x].drone is not None:
             draw_pixel_drone(
                 canvas,
@@ -512,14 +516,9 @@ def change_to_void(x, y):  # changement d'un pixel en void
     change_color(x, y, 1, "void")
 
 
-number_trash = 0
-
-
 def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
-    global number_trash
-    gazebo("trash", x, y, number_trash)
-    number_trash += 1
+    gazebo("trash", x, y)
 
 
 def change_to_robot(x, y):  # changement d'un pixel en robot
@@ -528,6 +527,7 @@ def change_to_robot(x, y):  # changement d'un pixel en robot
 
 def change_to_drone(x, y):  # changement d'un pixel en drone
     change_color(x, y, 3, "drone")
+    gazebo("warthog", x, y)
 
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
@@ -553,7 +553,7 @@ def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
 
     change_color(x, y, 1, "tronc")
 
-    gazebo("tree", x, y, number_tree)
+    gazebo("tree", x, y)
     number_tree += 1
 
 
