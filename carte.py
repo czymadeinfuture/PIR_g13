@@ -245,25 +245,43 @@ def mTSP():
 def gazebo(type_obj, y, x):
     command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
     try:
-        subprocess.Popen(command, shell=True, executable="/bin/bash")
+        subprocess.Popen(
+            command,
+            shell=True,
+            executable="/bin/bash",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except Exception as e:
         print(f"Failed to launch Gazebo: {e}")
 
 
-def gazebo_delete(type_obj, y, x):
-    command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
+def gazebo_delete(type_obj, y=None, x=None):
+    model_name = f"{type_obj}" if x is None and y is None else f"{type_obj}_{x}_{y}"
+    command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {model_name}}}'"  # noqa: E501
     print(command)
     try:
-        subprocess.Popen(command, shell=True, executable="/bin/bash")
+        subprocess.Popen(
+            command,
+            shell=True,
+            executable="/bin/bash",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except Exception as e:
         print(f"Failed to delete Gazebo model: {e}")
 
 
 def gazebo_deplacer(type_obj, y, x):
     command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
-    print(command)
     try:
-        subprocess.Popen(command, shell=True, executable="/bin/bash")
+        subprocess.Popen(
+            command,
+            shell=True,
+            executable="/bin/bash",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except Exception as e:
         print(f"Failed to delete Gazebo model: {e}")
 
@@ -334,6 +352,16 @@ def select_block(
     for y in range(start_y, end_y + 1):
         for x in range(start_x, end_x + 1):
             change_color(x, y, 1, new_etage1)
+            if new_etage1 == "obstacle":
+                gazebo("obstacle", x, y)
+            elif new_etage1 == "void":
+                print(f"Deleting {map[y][x].etage1} at ({x}, {y})")
+                if map[y][x].etage1 == "trash":
+                    gazebo_delete("trash", x, y)
+                elif map[y][x].etage1 == "tree":
+                    gazebo_delete("tree", x, y)
+                elif map[y][x].etage1 == "obstacle":
+                    gazebo_delete("obstacle", x, y)
 
 
 def select_and_draw(
@@ -643,11 +671,15 @@ def change_color(x, y, etage, element):
                 f"pixel{x}-{y}",
             )
 
-    elif map[y][x].etage2 != "void" and etage == 1 and element == "void":
+    elif map[y][x].etage2 == "feuillage" and etage == 1 and element == "void":
+        print("iciiiiiiiiiiiiiiiiiiiiii")
+        if map[y][x].etage1 == "trash":
+            gazebo_delete("trash", x, y)
+        if map[y][x].etage1 == "obstacle":
+            gazebo_delete("obstacle", x, y)
         map[y][x].etage1 = element
-        map[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
-        draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
+        draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
 
         if map[y][x].drone is not None:
             draw_pixel_drone(
@@ -660,6 +692,10 @@ def change_color(x, y, etage, element):
             )
 
     elif map[y][x].etage1 != "void" and element == "void":
+        if map[y][x].etage1 == "trash":
+            gazebo_delete("trash", x, y)
+        if map[y][x].etage1 == "obstacle":
+            gazebo_delete("obstacle", x, y)
         map[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
@@ -681,9 +717,8 @@ def change_to_void(x, y):  # changement d'un pixel en void
 def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
     global number_trash
-    gazebo("trash", x, y, number_trash)
+    gazebo("trash", x, y)
     mTSP()
-    number_trash += 1
 
 
 def change_to_robot(x, y):  # changement d'un pixel en robot
@@ -697,6 +732,7 @@ def change_to_drone(x, y):  # changement d'un pixel en drone
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
     change_color(x, y, 1, "obstacle")
+    gazebo("obstacle", x, y)
 
 
 def change_to_leaf(x, y):  # changement d'un pixel en feuillage
@@ -769,7 +805,31 @@ def place_random_tree():  # fonction placement d'un arbre aléatoire
 cliqued_switch = 0
 
 
+def filter_objects_by_name(objects_list, name):
+    return [obj for obj in objects_list if name in obj]
+
+
 def reset_grid():  # réinitialisation de la grille
+    command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call /gazebo/get_world_properties"  # noqa: E501
+    try:
+        output = subprocess.check_output(command, shell=True, executable="/bin/bash")
+        output = output.decode("utf-8")  # Convert bytes to string
+        lines = output.split("\n")  # Split output into lines
+        model_names = [
+            line.strip()[2:] for line in lines if line.strip().startswith("-")
+        ]  # Extract model names
+        print(model_names)
+    except Exception as e:
+        print(f"Failed to launch Gazebo: {e}")
+    filtered_objects = filter_objects_by_name(model_names, "tree")
+    filtered_objects += filter_objects_by_name(model_names, "trash")
+    filtered_objects += filter_objects_by_name(model_names, "warthog")
+    filtered_objects += filter_objects_by_name(model_names, "intelaero")
+    filtered_objects += filter_objects_by_name(model_names, "obstacle")
+    print(filtered_objects)
+    for obj in filtered_objects:
+        gazebo_delete(obj)
+
     for y in range(len(map)):
         for x in range(len(map[y])):
             change_to_void(x, y)
