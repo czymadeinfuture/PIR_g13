@@ -8,9 +8,14 @@ import tkinter.simpledialog as sd
 import tkinter as tk
 from tkinter.simpledialog import Dialog
 import math
-
-
+import pulp
+import numpy as np
+from geopy import distance as dis
 from colorama import Fore, Style
+import copy
+from python_tsp.heuristics import solve_tsp_local_search
+from python_tsp.exact import solve_tsp_dynamic_programming
+
 
 ###################################################
 # initialisation
@@ -22,6 +27,8 @@ interval_spawn_dechet = 1
 canvas_width = 700
 canvas_height = 700
 window_size = 200
+
+lines = []
 
 
 class Cellule:
@@ -74,6 +81,161 @@ COLORS = {  # couleurs des cases
     "robot": "#E4FF00",
     "drone": "#FFB200",
 }
+
+###################################################
+### mTSP
+###################################################
+
+
+# 2 fonctions pr le tsp
+def eucl_distance(a, b):
+    distance = math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+    return round(distance)
+
+
+def tsp_calculation(nodes_matrix):
+    distance_matrix = []
+    for i in range(len(nodes_matrix)):
+        distance_matrix.append([])
+        for e in range(len(nodes_matrix)):
+            distance_2_points = eucl_distance(nodes_matrix[i], nodes_matrix[e])
+            distance_matrix[i].append(distance_2_points)
+
+    distance_matrix_np = np.array(distance_matrix)
+
+    # print(distance_matrix_np)
+
+    # pr changer de méthode d'approche pr le tsp, changer sole_tsp_dynamic_programming par autre chose
+    # par exemplesole_tsp_local_search (voir le github pr ttes les méthodes)
+    permutation, distance = solve_tsp_dynamic_programming(distance_matrix_np)
+
+    # print(permutation, "\n", distance)
+
+    return permutation, distance
+
+
+def mTSP():
+    indices_dechets = []
+    indices_robots = []
+    trajet = []
+    couleurs_robots = [
+        "red",
+        "blue",
+        "green",
+        "orange",
+        "purple",
+        "cyan",
+        "black",
+        "yellow",
+    ]
+
+    for i in range(taille_carte):
+        for j in range(taille_carte):
+            if map[i][j].etage1 == "robot":
+                indices_robots.append((i, j))
+                trajet.append((i, j))
+    for i in range(taille_carte):
+        for j in range(taille_carte):
+            if map[i][j].etage1 == "trash":  # Si la cellule contient des déchets
+                indices_dechets.append((i, j))  # Enregistrer l'indice de la cellule
+                trajet.append((i, j))
+    if len(indices_dechets) >= 2 and len(indices_robots) >= 1:
+        ################################################
+        # Building distance matrix
+        ################################################
+        n = len(trajet)
+        C = np.zeros((n, n))
+        print(len(trajet))
+        for i in range(0, n):
+            for j in range(0, len(trajet)):
+                C[i, j] = dis.distance(trajet[i], trajet[j]).m
+
+        distance_matrix = np.array(C)
+        num_robots = len(indices_robots)
+        num_debris = len(indices_dechets)
+        print(num_robots)
+        print(num_debris)
+        # Création du problème
+        prob = pulp.LpProblem("mTSP", pulp.LpMinimize)
+
+        # Déclaration des variables
+        x = pulp.LpVariable.dicts(
+            "x",
+            [(i, j) for i in range(num_robots) for j in range(num_robots, len(trajet))],
+            cat="Binary",
+        )
+
+        # Fonction objectif
+        prob += pulp.lpSum(
+            distance_matrix[i, j] * x[(i, j)]
+            for i in range(num_robots)
+            for j in range(num_robots, len(trajet))
+        )
+
+        # Contraintes
+        for j in range(num_robots, len(trajet)):
+            prob += (
+                pulp.lpSum(x[(i, j)] for i in range(num_robots)) == 1
+            )  # Chaque déchet est attribué à exactement un robot
+
+        # Résolution
+        prob.solve()
+
+        # Affichage de la solution
+        trajet_par_robot = {}
+        print(f"Trajet : {trajet}")
+        for i in range(num_robots):
+            print(f"Chemin pour le robot {i+1}:")
+            trajet_par_robot[i + 1] = []
+            for j in range(num_robots, len(trajet)):
+                if pulp.value(x[(i, j)]) == 1:
+                    trajet_par_robot[i + 1].append(trajet[j])
+                    print(f"Déchet {j+1-num_robots}")
+        print(trajet_par_robot)
+
+        print(
+            "Distance totale minimale parcourue par tous les robots :",
+            pulp.value(prob.objective),
+        )
+
+        trajet_par_robot_tsp = copy.deepcopy(trajet_par_robot)
+        for robot in trajet_par_robot:
+            nodes_matrix = trajet_par_robot[robot]
+            if len(nodes_matrix) != 0:
+                permutation, distance = tsp_calculation(nodes_matrix)
+                print(
+                    f"\nRobot {robot} doit parcourir les points {permutation} pour une distance de {distance}"
+                )
+                for i in range(len(permutation)):
+                    # print(permutation[i])
+                    # print(f"trajet_par_robot = {trajet_par_robot[robot]}")
+                    point_equivalent = trajet_par_robot[robot][permutation[i]]
+                    # print(point_equivalent)
+                    trajet_par_robot_tsp[robot][i] = trajet_par_robot[robot][
+                        permutation[i]
+                    ]
+        print(f"\nTrajet final par robot : {trajet_par_robot_tsp}")
+
+        # afficher les trajets
+        print(f"lines : {lines}")
+        for line in lines:
+            canvas.delete(line)
+        for robot in trajet_par_robot_tsp:
+            ancien_point = trajet[robot - 1]
+            for point in trajet_par_robot_tsp[robot]:
+                print(ancien_point, point)
+                line = canvas.create_line(
+                    (1 / 2 + float(ancien_point[1])) * pixel_size,
+                    (1 / 2 + float(ancien_point[0])) * pixel_size,
+                    (1 / 2 + float(point[1])) * pixel_size,
+                    (1 / 2 + float(point[0])) * pixel_size,
+                    fill=couleurs_robots[robot - 1],
+                    width=3,
+                )
+                lines.append(line)
+                ancien_point = point
+        # resolution du TSP par robot
+
 
 ###################################################
 ###Gazebo
@@ -518,7 +680,10 @@ def change_to_void(x, y):  # changement d'un pixel en void
 
 def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
-    gazebo("trash", x, y)
+    global number_trash
+    gazebo("trash", x, y, number_trash)
+    mTSP()
+    number_trash += 1
 
 
 def change_to_robot(x, y):  # changement d'un pixel en robot
