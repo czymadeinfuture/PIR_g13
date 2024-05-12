@@ -810,6 +810,9 @@ def filter_objects_by_name(objects_list, name):
 
 
 def reset_grid():  # réinitialisation de la grille
+    for y in range(len(map)):
+        for x in range(len(map[y])):
+            change_to_void(x, y)
     command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call /gazebo/get_world_properties"  # noqa: E501
     try:
         output = subprocess.check_output(command, shell=True, executable="/bin/bash")
@@ -829,10 +832,6 @@ def reset_grid():  # réinitialisation de la grille
     print(filtered_objects)
     for obj in filtered_objects:
         gazebo_delete(obj)
-
-    for y in range(len(map)):
-        for x in range(len(map[y])):
-            change_to_void(x, y)
 
 
 def place_trash_periodically():  # fonction placement de déchets périodique
