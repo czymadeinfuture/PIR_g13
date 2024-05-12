@@ -348,7 +348,7 @@ def draw_pixel_drone(
 def draw_pixel_robot(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un robot
-    margin = pixel_size // 3
+    margin = pixel_size // 4
     canvas.create_polygon(
         x * pixel_size + margin,
         (y + 1) * pixel_size - margin,
