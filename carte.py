@@ -132,7 +132,7 @@ def mTSP():
 
     for i in range(taille_carte):
         for j in range(taille_carte):
-            if map[i][j].etage1 == "robot":
+            if map[i][j].robot is not None:
                 indices_robots.append((i, j))
                 trajet.append((i, j))
     for i in range(taille_carte):
