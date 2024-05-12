@@ -114,6 +114,40 @@ def tsp_calculation(nodes_matrix):
 
     return permutation, distance
 
+def bresenham_line(x0, y0, x1, y1):
+    """
+    Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
+    """
+    points = []
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = -1 if x0 > x1 else 1
+    sy = -1 if y0 > y1 else 1
+    err = dx - dy
+
+    while x0 != x1 or y0 != y1:
+        points.append((x0, y0))
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+    points.append((x1, y1))
+    return points
+
+def has_obstacle(matrix, x0, y0, x1, y1):
+    """
+    Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
+    """
+    line = bresenham_line(x0, y0, x1, y1)
+    for x, y in line:
+        if matrix[x][y].etage1 == "obstacle":  # Obstacle dans la matrice
+            return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
+    return False, None  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
+
 
 def mTSP():
     indices_dechets = []
@@ -215,7 +249,7 @@ def mTSP():
                     f"\nRobot {robot} doit parcourir les points {permutation} pour une distance de {distance}"
                 )
                 for i in range(len(permutation)):
-                    # print(permutation[i])
+                    print(permutation[i])
                     # print(f"trajet_par_robot = {trajet_par_robot[robot]}")
                     point_equivalent = trajet_par_robot[robot][permutation[i]]
                     # print(point_equivalent)
@@ -870,6 +904,7 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
 def change_to_robot(x, y):  # changement d'un pixel en robot
     change_color(x, y, 3, "robot")
     gazebo("warthog", x, y)
+    mTSP()
 
 
 def change_to_drone(x, y):  # changement d'un pixel en drone
@@ -900,7 +935,6 @@ def change_to_tree(x, y):  # changement d'un pixel en arbre (tronc + feuillage)
                     change_color(new_x, new_y, 2, "feuillage")
 
     change_color(x, y, 1, "tronc")
-
     gazebo("tree", x, y)
     number_tree += 1
 
