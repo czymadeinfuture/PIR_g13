@@ -672,7 +672,6 @@ def change_color(x, y, etage, element):
             )
 
     elif map[y][x].etage2 == "feuillage" and etage == 1 and element == "void":
-        print("iciiiiiiiiiiiiiiiiiiiiii")
         if map[y][x].etage1 == "trash":
             gazebo_delete("trash", x, y)
         if map[y][x].etage1 == "obstacle":
