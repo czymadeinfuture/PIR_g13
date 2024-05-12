@@ -337,6 +337,23 @@ def draw_pixel_drone(
     )
 
 
+def draw_pixel_robot(
+    canvas, x, y, color, pixel_size, tag
+):  # dessin d'un pixel sous un robot
+    margin = pixel_size // 3
+    canvas.create_polygon(
+        x * pixel_size + margin,
+        (y + 1) * pixel_size - margin,
+        (x + 1) * pixel_size - margin,
+        (y + 1) * pixel_size - margin,
+        (x + 0.5) * pixel_size,
+        y * pixel_size + margin,
+        fill=color,
+        outline="black",
+        tags=tag,
+    )
+
+
 def draw_map(canvas, window_size):  # dessin de la carte
     pixel_size = 3 * window_size // len(map)
     for y, row in enumerate(map):
@@ -431,6 +448,10 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
         robot_menu.add_command(
             label="Retirer drone", command=partial(retirer_drone, x, y)
         )
+    if map[y][x].robot is not None:
+        robot_menu.add_command(
+            label="Retirer robot", command=partial(retirer_robot, x, y)
+        )
 
     menu.add_cascade(label="Changer en", menu=change_menu)
     menu.add_cascade(label="Robots", menu=robot_menu)
@@ -472,15 +493,29 @@ def retirer_drone(x, y):
         except Exception as e:
             print(f"Failed to delete drone: {e}")
         change_color(x, y, 1, map[y][x].etage1)
-        if map[y][x].etage2 != "void":
+        if map[y][x].etage2 != "void" and map[y][x].etage1 != "void":
             draw_pixel_feuillage(
                 canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
             )
+        elif map[y][x].etage1 != "void":
+            draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, f"pixel{x}-{y}")
 
 
 def retirer_robot(x, y):
     if map[y][x].robot is not None:
         map[y][x].robot = None
+        try:
+            gazebo_delete("warthog", x, y)
+        except Exception as e:
+            print(f"Failed to delete robot: {e}")
+        change_color(x, y, 1, map[y][x].etage1)
+        if map[y][x].etage2 != "void" and map[y][x].etage1 != "void":
+            draw_pixel_feuillage(
+                canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
+            )
+        elif map[y][x].etage1 != "void":
+            draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, f"pixel{x}-{y}")
+
         gazebo_delete("warthog", x, y)
         change_color(x, y, 1, map[y][x].etage1)
         if map[y][x].etage2 != "void":
@@ -547,6 +582,9 @@ def change_color(x, y, etage, element):
     if element == "drone":
         draw_pixel_drone(canvas, x, y, COLORS["drone"], pixel_size, f"pixel{x}-{y}")
         map[y][x].drone = Drone(x, y)
+    elif element == "robot":
+        draw_pixel_robot(canvas, x, y, COLORS["robot"], pixel_size, f"pixel{x}-{y}")
+        map[y][x].robot = Robot(x, y)
 
     elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
         gazebo_delete("tree", x, y)
@@ -582,6 +620,15 @@ def change_color(x, y, etage, element):
                                     pixel_size,
                                     f"pixel{new_x}-{new_y}",
                                 )
+                            elif map[new_y][new_x].robot is not None:
+                                draw_pixel_robot(
+                                    canvas,
+                                    new_x,
+                                    new_y,
+                                    COLORS["robot"],
+                                    pixel_size,
+                                    f"pixel{new_x}-{new_y}",
+                                )
 
                         elif (
                             map[new_y][new_x].etage1 != "void"
@@ -605,6 +652,15 @@ def change_color(x, y, etage, element):
                                     pixel_size,
                                     f"pixel{new_x}-{new_y}",
                                 )
+                            elif map[new_y][new_x].robot is not None:
+                                draw_pixel_robot(
+                                    canvas,
+                                    new_x,
+                                    new_y,
+                                    COLORS["robot"],
+                                    pixel_size,
+                                    f"pixel{new_x}-{new_y}",
+                                )
                         else:
                             map[new_y][new_x].etage2 = "void"
                             draw_pixel(
@@ -621,6 +677,15 @@ def change_color(x, y, etage, element):
                                     new_x,
                                     new_y,
                                     COLORS["drone"],
+                                    pixel_size,
+                                    f"pixel{new_x}-{new_y}",
+                                )
+                            elif map[new_y][new_x].robot is not None:
+                                draw_pixel_robot(
+                                    canvas,
+                                    new_x,
+                                    new_y,
+                                    COLORS["robot"],
                                     pixel_size,
                                     f"pixel{new_x}-{new_y}",
                                 )
@@ -644,6 +709,18 @@ def change_color(x, y, etage, element):
                 pixel_size,
                 f"pixel{x}-{y}",
             )
+        elif map[y][x].robot is not None:
+            tag = f"pixel{x}-{y}"
+            draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
+            if map[y][x].robot is not None:
+                draw_pixel_robot(
+                    canvas,
+                    x,
+                    y,
+                    COLORS["robot"],
+                    pixel_size,
+                    f"pixel{x}-{y}",
+                )
 
     elif map[y][x].etage1 == "void" and map[y][x].etage2 == "void" and etage == 1:
         map[y][x].etage1 = element
@@ -655,6 +732,15 @@ def change_color(x, y, etage, element):
                 x,
                 y,
                 COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
                 pixel_size,
                 f"pixel{x}-{y}",
             )
@@ -672,6 +758,15 @@ def change_color(x, y, etage, element):
                 pixel_size,
                 f"pixel{x}-{y}",
             )
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
     elif map[y][x].etage1 != "void" and etage == 2:
         map[y][x].etage2 = element
@@ -684,6 +779,15 @@ def change_color(x, y, etage, element):
                 x,
                 y,
                 COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
                 pixel_size,
                 f"pixel{x}-{y}",
             )
@@ -706,6 +810,15 @@ def change_color(x, y, etage, element):
                 pixel_size,
                 f"pixel{x}-{y}",
             )
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
     elif map[y][x].etage1 != "void" and element == "void":
         if map[y][x].etage1 == "trash":
@@ -721,6 +834,15 @@ def change_color(x, y, etage, element):
                 x,
                 y,
                 COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
                 pixel_size,
                 f"pixel{x}-{y}",
             )
