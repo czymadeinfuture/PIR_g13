@@ -139,6 +139,13 @@ def mTSP():
             if map[i][j].etage1 == "trash":  # Si la cellule contient des déchets
                 indices_dechets.append((i, j))  # Enregistrer l'indice de la cellule
                 trajet.append((i, j))
+            if map[i][j].etage1 == "tronc":
+                if j != 0:
+                    indices_dechets.append((i, j - 1))
+                    trajet.append((i, j - 1))
+                else:
+                    indices_dechets.append((i, j + 1))
+                    trajet.append((i, j + 1))
     if len(indices_dechets) >= 2 and len(indices_robots) >= 1:
         ################################################
         # Building distance matrix
@@ -243,10 +250,7 @@ def mTSP():
 
 
 def gazebo(type_obj, y, x):
-    if type_obj == "intelaero":
-        command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project intelaero.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)} z:=10 roll:=0.0 pitch:=0.0 yaw:=0.0 detector_range:=10"  # noqa: E501
-    else:
-        command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
+    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
     try:
         subprocess.Popen(
             command,
@@ -436,10 +440,10 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
 
     robot_menu = tk.Menu(menu, tearoff=0)
     robot_menu.add_command(
-        label="Placer un robot", command=partial(change_to_robot, x, y)
+        label="Placer un drone", command=partial(change_to_robot, x, y)
     )
     robot_menu.add_command(
-        label="Placer un drone", command=partial(change_to_drone, x, y)
+        label="Placer un robot", command=partial(change_to_drone, x, y)
     )
     if map[y][x].drone is not None:
         robot_menu.add_command(
@@ -860,13 +864,12 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
 
 
 def change_to_robot(x, y):  # changement d'un pixel en robot
-    change_color(x, y, 3, "robot")
-    gazebo("warthog", x, y)
+    change_color(x, y, 1, "robot")
 
 
 def change_to_drone(x, y):  # changement d'un pixel en drone
     change_color(x, y, 3, "drone")
-    gazebo("intelaero", x, y)
+    gazebo("warthog", x, y)
 
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
