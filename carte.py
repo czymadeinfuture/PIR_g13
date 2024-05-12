@@ -243,7 +243,10 @@ def mTSP():
 
 
 def gazebo(type_obj, y, x):
-    command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
+    if type_obj == "intelaero":
+        command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project intelaero.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)} z:=10 roll:=0.0 pitch:=0.0 yaw:=0.0 detector_range:=10"  # noqa: E501
+    else:
+        command = f"cd ~/catkin_ws && source devel/setup.bash && roslaunch gazebo_project {type_obj}.launch drone_name:={type_obj}_{x}_{y} x:={-(x-taille_carte//2)} y:={-(y-taille_carte//2)}"  # noqa: E501
     try:
         subprocess.Popen(
             command,
@@ -416,17 +419,17 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
 
     robot_menu = tk.Menu(menu, tearoff=0)
     robot_menu.add_command(
-        label="Placer un drone", command=partial(change_to_robot, x, y)
+        label="Placer un robot", command=partial(change_to_robot, x, y)
     )
     robot_menu.add_command(
-        label="Placer un robot", command=partial(change_to_drone, x, y)
+        label="Placer un drone", command=partial(change_to_drone, x, y)
     )
     if map[y][x].drone is not None:
         robot_menu.add_command(
             label="Déplacer robot", command=partial(animate_drone_move, x, y)
         )
         robot_menu.add_command(
-            label="Retirer robot", command=partial(retirer_drone, x, y)
+            label="Retirer drone", command=partial(retirer_drone, x, y)
         )
 
     menu.add_cascade(label="Changer en", menu=change_menu)
@@ -464,6 +467,20 @@ def ask_for_coordinates():
 def retirer_drone(x, y):
     if map[y][x].drone is not None:
         map[y][x].drone = None
+        try:
+            gazebo_delete("intelaero", x, y)
+        except Exception as e:
+            print(f"Failed to delete drone: {e}")
+        change_color(x, y, 1, map[y][x].etage1)
+        if map[y][x].etage2 != "void":
+            draw_pixel_feuillage(
+                canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
+            )
+
+
+def retirer_robot(x, y):
+    if map[y][x].robot is not None:
+        map[y][x].robot = None
         gazebo_delete("warthog", x, y)
         change_color(x, y, 1, map[y][x].etage1)
         if map[y][x].etage2 != "void":
@@ -721,12 +738,13 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
 
 
 def change_to_robot(x, y):  # changement d'un pixel en robot
-    change_color(x, y, 1, "robot")
+    change_color(x, y, 3, "robot")
+    gazebo("warthog", x, y)
 
 
 def change_to_drone(x, y):  # changement d'un pixel en drone
     change_color(x, y, 3, "drone")
-    gazebo("warthog", x, y)
+    gazebo("intelaero", x, y)
 
 
 def change_to_obstacle(x, y):  # changement d'un pixel en obstacle
