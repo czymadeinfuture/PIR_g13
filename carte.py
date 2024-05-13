@@ -577,6 +577,15 @@ def retirer_drone(x, y):
             )
         elif map[y][x].etage1 != "void":
             draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, f"pixel{x}-{y}")
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
 
 def retirer_robot(x, y):
@@ -599,6 +608,15 @@ def retirer_robot(x, y):
         if map[y][x].etage2 != "void":
             draw_pixel_feuillage(
                 canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
+            )
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
             )
 
 
