@@ -1,22 +1,21 @@
-import copy
-import math
 import random
 import subprocess
 import threading
 import time
 import tkinter as tk
-import tkinter.simpledialog as sd
 from functools import partial
+import tkinter.simpledialog as sd
+import tkinter as tk
 from tkinter.simpledialog import Dialog
-import pickle
-from tkinter import filedialog
-
-import numpy as np
+import math
 import pulp
-from colorama import Fore, Style
+import numpy as np
 from geopy import distance as dis
-from python_tsp.exact import solve_tsp_dynamic_programming
+from colorama import Fore, Style
+import copy
 from python_tsp.heuristics import solve_tsp_local_search
+from python_tsp.exact import solve_tsp_dynamic_programming
+
 
 ###################################################
 # initialisation
@@ -115,10 +114,10 @@ def tsp_calculation(nodes_matrix):
 
     return permutation, distance
 
-
 def bresenham_line(x0, y0, x1, y1):
-     # Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
-    
+    """
+    Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
+    """
     points = []
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)
@@ -139,30 +138,16 @@ def bresenham_line(x0, y0, x1, y1):
     points.append((x1, y1))
     return points
 
-
 def has_obstacle(matrix, x0, y0, x1, y1):
-   
-    # Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
-    
+    """
+    Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
+    """
     line = bresenham_line(x0, y0, x1, y1)
     for x, y in line:
-        if matrix[x][y].etage1 == "obstacle" or matrix[x][y].etage1 == "tronc":  # Obstacle dans la matrice
+        if matrix[x][y].etage1 == "obstacle":  # Obstacle dans la matrice
             return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
-    return (
-        False,
-        None,
-    )  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
+    return False, None  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
 
-def plus_proche(x, y, z):
-    # Calculer les différences absolues entre x et y, et entre x et z
-    diff_xy = abs(x - y)
-    diff_xz = abs(x - z)
-    
-    # Comparer les différences et retourner le nombre le plus proche de x
-    if diff_xy < diff_xz:
-        return y
-    else:
-        return z
 
 def mTSP():
     indices_dechets = []
@@ -271,50 +256,6 @@ def mTSP():
                     trajet_par_robot_tsp[robot][i] = trajet_par_robot[robot][
                         permutation[i]
                     ]
-        test=1
-        while test!=0:
-            test=0
-            for robot in trajet_par_robot_tsp:
-                compteur_index=0
-                ancien_point = trajet[robot - 1]
-                for point in trajet_par_robot_tsp[robot]: 
-                        obstacle_found, obstacle_coords = has_obstacle(map, ancien_point[0], ancien_point[1], point[0], point[1])
-                        if obstacle_found:
-                            if abs(ancien_point[0]-point[0])<=abs(ancien_point[1]-point[1]):
-                                if (plus_proche(obstacle_coords[0],ancien_point[0],point[0])==ancien_point[0] or obstacle_coords[0]==0) and obstacle_coords[0]<taille_carte:
-                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))
-                                    nouvelle_coord=(obstacle_coords[0]+1,obstacle_coords[1])
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord
-                                    
-                                #elif ((plus_proche(obstacle_coords[0],ancien_point[0],point[0])==point[0]) or obstacle_coords[0]==taille_carte-1):  
-                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))  
-                                    #nouvelle_coord=(obstacle_coords[0]-1,obstacle_coords[1])
-                                    #trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    #ancien_point = nouvelle_coord
-                                
-                                else:    
-                                    nouvelle_coord=(obstacle_coords[0]-1,obstacle_coords[1])
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord
-                            else:        
-                                if (plus_proche(obstacle_coords[1],ancien_point[1],point[1])==ancien_point[1] or obstacle_coords[1]==0) and obstacle_coords[0]<taille_carte:
-                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))
-                                    nouvelle_coord=(obstacle_coords[0],obstacle_coords[1]+1)
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord
-                                else:    
-                                    nouvelle_coord=(obstacle_coords[0],obstacle_coords[1]-1)
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord    
-                                    
-                            print("Il y a un obstacle sur la ligne aux coordonnées :", obstacle_coords)
-                            test+=1
-                        else:
-                            print("Il n'y a pas d'obstacle sur la ligne.")
-                            ancien_point = point
-                        compteur_index+=1
-                            
         print(f"\nTrajet final par robot : {trajet_par_robot_tsp}")
 
         # afficher les trajets
@@ -336,51 +277,6 @@ def mTSP():
                 lines.append(line)
                 ancien_point = point
         # resolution du TSP par robot
-
-
-###################################################
-### Import export de cartes
-###################################################
-def open_file_dialog():
-    file_path = filedialog.askopenfilename()
-    import_map(file_path)
-
-
-def export_file_dialog():
-    file_path = filedialog.asksaveasfilename(defaultextension=".txt")
-    if file_path:
-        export_map(map, file_path)
-
-
-def export_map(map, file_path):
-    map_export = [[0 for j in range(taille_carte)] for i in range(taille_carte)]
-    for x in range(taille_carte):
-        for y in range(taille_carte):
-            if map[y][x].etage1 != "void":
-                print(map[y][x].etage1)
-            if map[y][x].etage1 == "obstacle":
-                map_export[y][x] = "obstacle"
-            if map[y][x].etage1 == "trash":
-                map_export[y][x] = "trash"
-            if map[y][x].etage1 == "tronc":
-                map_export[y][x] = "tronc"
-
-    np.savetxt(file_path, map_export, fmt="%s")
-
-
-def import_map(file_path):
-    map_importée = np.loadtxt(file_path, dtype=str)
-    print(map_importée)
-    reset_grid(True)
-    for x in range(taille_carte):
-        for y in range(taille_carte):
-            if map_importée[y][x] == "obstacle":
-                change_to_obstacle(x, y)
-            if map_importée[y][x] == "trash":
-                change_to_trash(x, y)
-            if map_importée[y][x] == "tronc":
-                print("oui c un arbre")
-                change_to_tree(x, y)
 
 
 ###################################################
@@ -472,61 +368,30 @@ def draw_pixel_feuillage(
 def draw_pixel_drone(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un drone
-    margin = pixel_size // 2.5
-    radius = pixel_size // 3.5
-    for dx in [0.15, 0.85]:
-        for dy in [0.15, 0.85]:
-            canvas.create_oval(
-                (x + dx) * pixel_size - radius + margin,
-                (y + dy) * pixel_size - radius + margin,
-                (x + dx) * pixel_size + radius - margin,
-                (y + dy) * pixel_size + radius - margin,
-                fill=color,
-                tags=tag,
-            )
+    margin = pixel_size // 3
+    canvas.create_oval(
+        x * pixel_size + margin,
+        y * pixel_size + margin,
+        (x + 1) * pixel_size - margin,
+        (y + 1) * pixel_size - margin,
+        fill=color,
+        tags=tag,
+    )
 
 
 def draw_pixel_robot(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un robot
     margin = pixel_size // 4
-    width = pixel_size // 10
-    # Draw black outline
-    canvas.create_line(
-        x * pixel_size + margin,
-        y * pixel_size + margin,
-        (x + 1) * pixel_size - margin,
-        (y + 1) * pixel_size - margin,
-        fill="black",
-        width=width * 2,
-        tags=tag,
-    )
-    canvas.create_line(
-        (x + 1) * pixel_size - margin,
-        y * pixel_size + margin,
+    canvas.create_polygon(
         x * pixel_size + margin,
         (y + 1) * pixel_size - margin,
-        fill="black",
-        width=width * 2,
-        tags=tag,
-    )
-    # Draw colored line
-    canvas.create_line(
-        x * pixel_size + margin,
-        y * pixel_size + margin,
         (x + 1) * pixel_size - margin,
         (y + 1) * pixel_size - margin,
+        (x + 0.5) * pixel_size,
+        y * pixel_size + margin,
         fill=color,
-        width=width,
-        tags=tag,
-    )
-    canvas.create_line(
-        (x + 1) * pixel_size - margin,
-        y * pixel_size + margin,
-        x * pixel_size + margin,
-        (y + 1) * pixel_size - margin,
-        fill=color,
-        width=width,
+        outline="black",
         tags=tag,
     )
 
@@ -619,9 +484,9 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
         label="Placer un drone", command=partial(change_to_drone, x, y)
     )
     if map[y][x].drone is not None:
-        # robot_menu.add_command(
-        #     label="Déplacer robot", command=partial(animate_drone_move, x, y)
-        # )
+        robot_menu.add_command(
+            label="Déplacer robot", command=partial(animate_drone_move, x, y)
+        )
         robot_menu.add_command(
             label="Retirer drone", command=partial(retirer_drone, x, y)
         )
@@ -676,15 +541,6 @@ def retirer_drone(x, y):
             )
         elif map[y][x].etage1 != "void":
             draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, f"pixel{x}-{y}")
-        if map[y][x].robot is not None:
-            draw_pixel_robot(
-                canvas,
-                x,
-                y,
-                COLORS["robot"],
-                pixel_size,
-                f"pixel{x}-{y}",
-            )
 
 
 def retirer_robot(x, y):
@@ -707,15 +563,6 @@ def retirer_robot(x, y):
         if map[y][x].etage2 != "void":
             draw_pixel_feuillage(
                 canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
-            )
-        if map[y][x].drone is not None:
-            draw_pixel_drone(
-                canvas,
-                x,
-                y,
-                COLORS["drone"],
-                pixel_size,
-                f"pixel{x}-{y}",
             )
 
 
@@ -1143,16 +990,10 @@ def filter_objects_by_name(objects_list, name):
     return [obj for obj in objects_list if name in obj]
 
 
-def reset_grid(que_environnement=False):  # réinitialisation de la grille
+def reset_grid():  # réinitialisation de la grille
     for y in range(len(map)):
         for x in range(len(map[y])):
             change_to_void(x, y)
-            if not que_environnement:
-                if map[y][x].drone is not None:
-                    retirer_drone(x, y)
-                if map[y][x].robot is not None:
-                    retirer_robot(x, y)
-
     command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call /gazebo/get_world_properties"  # noqa: E501
     try:
         output = subprocess.check_output(command, shell=True, executable="/bin/bash")
@@ -1166,11 +1007,9 @@ def reset_grid(que_environnement=False):  # réinitialisation de la grille
         print(f"Failed to launch Gazebo: {e}")
     filtered_objects = filter_objects_by_name(model_names, "tree")
     filtered_objects += filter_objects_by_name(model_names, "trash")
+    filtered_objects += filter_objects_by_name(model_names, "warthog")
+    filtered_objects += filter_objects_by_name(model_names, "intelaero")
     filtered_objects += filter_objects_by_name(model_names, "obstacle")
-    if not que_environnement:
-        filtered_objects += filter_objects_by_name(model_names, "warthog")
-        filtered_objects += filter_objects_by_name(model_names, "intelaero")
-
     print(filtered_objects)
     for obj in filtered_objects:
         gazebo_delete(obj)
@@ -1224,16 +1063,8 @@ trash_cycle_button.grid(row=2, column=0, sticky="w")
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
 tree_button.grid(row=0, column=1, sticky="e")
 
-reset_button = bouton(
-    "Réinitialiser environnement", lambda: reset_grid(True), "#FF8080"
-)
+reset_button = bouton("Réinitialiser", reset_grid, "red")
 reset_button.grid(row=1, column=1, sticky="e")
-reset2_button = bouton("Réinitialiser tout", reset_grid, "red")
-reset2_button.grid(row=2, column=1, sticky="e")
-open_file_button = bouton("Ouvrir fichier", open_file_dialog, "blue")
-open_file_button.grid(row=4, column=0, columnspan=2, sticky="nsew")
-export_button = bouton("Exporter fichier", export_file_dialog, "blue")
-export_button.grid(row=5, column=0, columnspan=2, sticky="nsew")
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
@@ -1241,5 +1072,4 @@ canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
 canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill="white")
 
 draw_map(canvas, window_size)
-
 root.mainloop()
