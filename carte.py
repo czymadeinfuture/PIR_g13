@@ -1,21 +1,22 @@
+import copy
+import math
 import random
 import subprocess
 import threading
 import time
 import tkinter as tk
-from functools import partial
 import tkinter.simpledialog as sd
-import tkinter as tk
+from functools import partial
 from tkinter.simpledialog import Dialog
-import math
-import pulp
-import numpy as np
-from geopy import distance as dis
-from colorama import Fore, Style
-import copy
-from python_tsp.heuristics import solve_tsp_local_search
-from python_tsp.exact import solve_tsp_dynamic_programming
+import pickle
+from tkinter import filedialog
 
+import numpy as np
+import pulp
+from colorama import Fore, Style
+from geopy import distance as dis
+from python_tsp.exact import solve_tsp_dynamic_programming
+from python_tsp.heuristics import solve_tsp_local_search
 
 ###################################################
 # initialisation
@@ -282,6 +283,51 @@ def mTSP():
                 lines.append(line)
                 ancien_point = point
         # resolution du TSP par robot
+
+
+###################################################
+### Import export de cartes
+###################################################
+def open_file_dialog():
+    file_path = filedialog.askopenfilename()
+    import_map(file_path)
+
+
+def export_file_dialog():
+    file_path = filedialog.asksaveasfilename(defaultextension=".txt")
+    if file_path:
+        export_map(map, file_path)
+
+
+def export_map(map, file_path):
+    map_export = [[0 for j in range(taille_carte)] for i in range(taille_carte)]
+    for x in range(taille_carte):
+        for y in range(taille_carte):
+            if map[y][x].etage1 != "void":
+                print(map[y][x].etage1)
+            if map[y][x].etage1 == "obstacle":
+                map_export[y][x] = "obstacle"
+            if map[y][x].etage1 == "trash":
+                map_export[y][x] = "trash"
+            if map[y][x].etage1 == "tronc":
+                map_export[y][x] = "tronc"
+
+    np.savetxt(file_path, map_export, fmt="%s")
+
+
+def import_map(file_path):
+    map_importée = np.loadtxt(file_path, dtype=str)
+    print(map_importée)
+    reset_grid(True)
+    for x in range(taille_carte):
+        for y in range(taille_carte):
+            if map_importée[y][x] == "obstacle":
+                change_to_obstacle(x, y)
+            if map_importée[y][x] == "trash":
+                change_to_trash(x, y)
+            if map_importée[y][x] == "tronc":
+                print("oui c un arbre")
+                change_to_tree(x, y)
 
 
 ###################################################
@@ -1131,6 +1177,10 @@ reset_button = bouton(
 reset_button.grid(row=1, column=1, sticky="e")
 reset2_button = bouton("Réinitialiser tout", reset_grid, "red")
 reset2_button.grid(row=2, column=1, sticky="e")
+open_file_button = bouton("Ouvrir fichier", open_file_dialog, "blue")
+open_file_button.grid(row=4, column=0, columnspan=2, sticky="nsew")
+export_button = bouton("Exporter fichier", export_file_dialog, "blue")
+export_button.grid(row=5, column=0, columnspan=2, sticky="nsew")
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
@@ -1138,4 +1188,5 @@ canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
 canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill="white")
 
 draw_map(canvas, window_size)
+
 root.mainloop()
