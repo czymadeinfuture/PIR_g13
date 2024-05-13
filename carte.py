@@ -115,9 +115,8 @@ def tsp_calculation(nodes_matrix):
     return permutation, distance
 
 def bresenham_line(x0, y0, x1, y1):
-    """
-    Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
-    """
+     # Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
+    
     points = []
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)
@@ -139,15 +138,25 @@ def bresenham_line(x0, y0, x1, y1):
     return points
 
 def has_obstacle(matrix, x0, y0, x1, y1):
-    """
-    Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
-    """
+   
+    # Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
+    
     line = bresenham_line(x0, y0, x1, y1)
     for x, y in line:
-        if matrix[x][y].etage1 == "obstacle":  # Obstacle dans la matrice
+        if matrix[x][y].etage1 == "obstacle" or matrix[x][y].etage1 == "tronc":  # Obstacle dans la matrice
             return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
     return False, None  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
 
+def plus_proche(x, y, z):
+    # Calculer les différences absolues entre x et y, et entre x et z
+    diff_xy = abs(x - y)
+    diff_xz = abs(x - z)
+    
+    # Comparer les différences et retourner le nombre le plus proche de x
+    if diff_xy < diff_xz:
+        return y
+    else:
+        return z
 
 def mTSP():
     indices_dechets = []
@@ -256,6 +265,50 @@ def mTSP():
                     trajet_par_robot_tsp[robot][i] = trajet_par_robot[robot][
                         permutation[i]
                     ]
+        test=1
+        while test!=0:
+            test=0
+            for robot in trajet_par_robot_tsp:
+                compteur_index=0
+                ancien_point = trajet[robot - 1]
+                for point in trajet_par_robot_tsp[robot]: 
+                        obstacle_found, obstacle_coords = has_obstacle(map, ancien_point[0], ancien_point[1], point[0], point[1])
+                        if obstacle_found:
+                            if abs(ancien_point[0]-point[0])<=abs(ancien_point[1]-point[1]):
+                                if (plus_proche(obstacle_coords[0],ancien_point[0],point[0])==ancien_point[0] or obstacle_coords[0]==0) and obstacle_coords[0]<taille_carte:
+                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))
+                                    nouvelle_coord=(obstacle_coords[0]+1,obstacle_coords[1])
+                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
+                                    ancien_point = nouvelle_coord
+                                    
+                                #elif ((plus_proche(obstacle_coords[0],ancien_point[0],point[0])==point[0]) or obstacle_coords[0]==taille_carte-1):  
+                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))  
+                                    #nouvelle_coord=(obstacle_coords[0]-1,obstacle_coords[1])
+                                    #trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
+                                    #ancien_point = nouvelle_coord
+                                
+                                else:    
+                                    nouvelle_coord=(obstacle_coords[0]-1,obstacle_coords[1])
+                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
+                                    ancien_point = nouvelle_coord
+                            else:        
+                                if (plus_proche(obstacle_coords[1],ancien_point[1],point[1])==ancien_point[1] or obstacle_coords[1]==0) and obstacle_coords[0]<taille_carte:
+                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))
+                                    nouvelle_coord=(obstacle_coords[0],obstacle_coords[1]+1)
+                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
+                                    ancien_point = nouvelle_coord
+                                else:    
+                                    nouvelle_coord=(obstacle_coords[0],obstacle_coords[1]-1)
+                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
+                                    ancien_point = nouvelle_coord    
+                                    
+                            print("Il y a un obstacle sur la ligne aux coordonnées :", obstacle_coords)
+                            test+=1
+                        else:
+                            print("Il n'y a pas d'obstacle sur la ligne.")
+                            ancien_point = point
+                        compteur_index+=1
+                            
         print(f"\nTrajet final par robot : {trajet_par_robot_tsp}")
 
         # afficher les trajets
