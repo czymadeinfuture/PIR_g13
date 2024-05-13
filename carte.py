@@ -566,9 +566,9 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
         label="Placer un drone", command=partial(change_to_drone, x, y)
     )
     if map[y][x].drone is not None:
-        robot_menu.add_command(
-            label="Déplacer robot", command=partial(animate_drone_move, x, y)
-        )
+        # robot_menu.add_command(
+        #     label="Déplacer robot", command=partial(animate_drone_move, x, y)
+        # )
         robot_menu.add_command(
             label="Retirer drone", command=partial(retirer_drone, x, y)
         )
