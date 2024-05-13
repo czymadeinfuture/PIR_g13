@@ -114,6 +114,7 @@ def tsp_calculation(nodes_matrix):
 
     return permutation, distance
 
+
 def bresenham_line(x0, y0, x1, y1):
     """
     Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
@@ -138,6 +139,7 @@ def bresenham_line(x0, y0, x1, y1):
     points.append((x1, y1))
     return points
 
+
 def has_obstacle(matrix, x0, y0, x1, y1):
     """
     Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
@@ -146,7 +148,10 @@ def has_obstacle(matrix, x0, y0, x1, y1):
     for x, y in line:
         if matrix[x][y].etage1 == "obstacle":  # Obstacle dans la matrice
             return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
-    return False, None  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
+    return (
+        False,
+        None,
+    )  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
 
 
 def mTSP():
@@ -368,30 +373,61 @@ def draw_pixel_feuillage(
 def draw_pixel_drone(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un drone
-    margin = pixel_size // 3
-    canvas.create_oval(
-        x * pixel_size + margin,
-        y * pixel_size + margin,
-        (x + 1) * pixel_size - margin,
-        (y + 1) * pixel_size - margin,
-        fill=color,
-        tags=tag,
-    )
+    margin = pixel_size // 2.5
+    radius = pixel_size // 3.5
+    for dx in [0.15, 0.85]:
+        for dy in [0.15, 0.85]:
+            canvas.create_oval(
+                (x + dx) * pixel_size - radius + margin,
+                (y + dy) * pixel_size - radius + margin,
+                (x + dx) * pixel_size + radius - margin,
+                (y + dy) * pixel_size + radius - margin,
+                fill=color,
+                tags=tag,
+            )
 
 
 def draw_pixel_robot(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un robot
     margin = pixel_size // 4
-    canvas.create_polygon(
+    width = pixel_size // 10
+    # Draw black outline
+    canvas.create_line(
         x * pixel_size + margin,
-        (y + 1) * pixel_size - margin,
+        y * pixel_size + margin,
         (x + 1) * pixel_size - margin,
         (y + 1) * pixel_size - margin,
-        (x + 0.5) * pixel_size,
+        fill="black",
+        width=width * 2,
+        tags=tag,
+    )
+    canvas.create_line(
+        (x + 1) * pixel_size - margin,
         y * pixel_size + margin,
+        x * pixel_size + margin,
+        (y + 1) * pixel_size - margin,
+        fill="black",
+        width=width * 2,
+        tags=tag,
+    )
+    # Draw colored line
+    canvas.create_line(
+        x * pixel_size + margin,
+        y * pixel_size + margin,
+        (x + 1) * pixel_size - margin,
+        (y + 1) * pixel_size - margin,
         fill=color,
-        outline="black",
+        width=width,
+        tags=tag,
+    )
+    canvas.create_line(
+        (x + 1) * pixel_size - margin,
+        y * pixel_size + margin,
+        x * pixel_size + margin,
+        (y + 1) * pixel_size - margin,
+        fill=color,
+        width=width,
         tags=tag,
     )
 
@@ -990,7 +1026,7 @@ def filter_objects_by_name(objects_list, name):
     return [obj for obj in objects_list if name in obj]
 
 
-def reset_grid():  # réinitialisation de la grille
+def reset_grid(tout=False):  # réinitialisation de la grille
     for y in range(len(map)):
         for x in range(len(map[y])):
             change_to_void(x, y)
@@ -1063,8 +1099,10 @@ trash_cycle_button.grid(row=2, column=0, sticky="w")
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
 tree_button.grid(row=0, column=1, sticky="e")
 
-reset_button = bouton("Réinitialiser", reset_grid, "red")
+reset_button = bouton("Réinitialiser environnement", reset_grid, "red")
 reset_button.grid(row=1, column=1, sticky="e")
+reset2_button = bouton("Réinitialiser tout", reset_grid, "red")
+reset2_button.grid(row=1, column=1, sticky="e")
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
