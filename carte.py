@@ -1044,10 +1044,16 @@ def filter_objects_by_name(objects_list, name):
     return [obj for obj in objects_list if name in obj]
 
 
-def reset_grid(tout=False):  # réinitialisation de la grille
+def reset_grid(que_environnement=False):  # réinitialisation de la grille
     for y in range(len(map)):
         for x in range(len(map[y])):
             change_to_void(x, y)
+            if not que_environnement:
+                if map[y][x].drone is not None:
+                    retirer_drone(x, y)
+                if map[y][x].robot is not None:
+                    retirer_robot(x, y)
+
     command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call /gazebo/get_world_properties"  # noqa: E501
     try:
         output = subprocess.check_output(command, shell=True, executable="/bin/bash")
@@ -1061,9 +1067,11 @@ def reset_grid(tout=False):  # réinitialisation de la grille
         print(f"Failed to launch Gazebo: {e}")
     filtered_objects = filter_objects_by_name(model_names, "tree")
     filtered_objects += filter_objects_by_name(model_names, "trash")
-    filtered_objects += filter_objects_by_name(model_names, "warthog")
-    filtered_objects += filter_objects_by_name(model_names, "intelaero")
     filtered_objects += filter_objects_by_name(model_names, "obstacle")
+    if not que_environnement:
+        filtered_objects += filter_objects_by_name(model_names, "warthog")
+        filtered_objects += filter_objects_by_name(model_names, "intelaero")
+
     print(filtered_objects)
     for obj in filtered_objects:
         gazebo_delete(obj)
@@ -1117,10 +1125,12 @@ trash_cycle_button.grid(row=2, column=0, sticky="w")
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
 tree_button.grid(row=0, column=1, sticky="e")
 
-reset_button = bouton("Réinitialiser environnement", reset_grid, "red")
+reset_button = bouton(
+    "Réinitialiser environnement", lambda: reset_grid(True), "#FF8080"
+)
 reset_button.grid(row=1, column=1, sticky="e")
 reset2_button = bouton("Réinitialiser tout", reset_grid, "red")
-reset2_button.grid(row=1, column=1, sticky="e")
+reset2_button.grid(row=2, column=1, sticky="e")
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
