@@ -110,6 +110,7 @@ def tsp_calculation(nodes_matrix):
     # pr changer de méthode d'approche pr le tsp, changer sole_tsp_dynamic_programming par autre chose
     # par exemplesole_tsp_local_search (voir le github pr ttes les méthodes)
     permutation, distance = solve_tsp_dynamic_programming(distance_matrix_np)
+    #permutation, distance = solve_tsp_local_search(distance_matrix_np)
 
     # print(permutation, "\n", distance)
 
@@ -243,7 +244,7 @@ def mTSP():
         print(f"Trajet : {trajet}")
         for i in range(num_robots):
             print(f"Chemin pour le robot {i+1}:")
-            trajet_par_robot[i + 1] = [trajet[i]
+            trajet_par_robot[i + 1] = [trajet[i]]
             for j in range(num_robots, len(trajet)):
                 if pulp.value(x[(i, j)]) == 1:
                     trajet_par_robot[i + 1].append(trajet[j])
