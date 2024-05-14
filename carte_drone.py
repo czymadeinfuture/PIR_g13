@@ -200,7 +200,7 @@ class Drone_courant:
                     pixel_y = center_y + dy
                     grid_x = int((pixel_x // pixel_size))
                     grid_y = int((pixel_y // pixel_size))
-                    if 0 <= grid_x < taille_carte and 0 <= grid_y < taille_carte:
+                    if (0 <= grid_x < taille_carte and 0 <= grid_y < taille_carte) and (pixel_x % pixel_size != 0 and pixel_y % pixel_size != 0):
                         item_id = canvas.find_closest(pixel_x, pixel_y)
                         item_color = canvas.itemcget(item_id, "fill")
                         if self.map_copy[grid_y][grid_x] == 0 and item_color == COLORS["trash"]:
