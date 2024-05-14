@@ -243,7 +243,7 @@ def mTSP():
         print(f"Trajet : {trajet}")
         for i in range(num_robots):
             print(f"Chemin pour le robot {i+1}:")
-            trajet_par_robot[i + 1] = []
+            trajet_par_robot[i + 1] = [trajet[i]
             for j in range(num_robots, len(trajet)):
                 if pulp.value(x[(i, j)]) == 1:
                     trajet_par_robot[i + 1].append(trajet[j])
