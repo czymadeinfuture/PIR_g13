@@ -191,7 +191,7 @@ class Drone_courant:
     def scan_for_trash(self, canvas):
         radius_pixels = self.scan_radius 
         center_x = (self.x + 0.5) * pixel_size
-        center_y = (self.y + 0.5) * pixel_size + 10
+        center_y = (self.y + 0.5) * pixel_size 
 
         for dx in range(-radius_pixels, radius_pixels + 1):
             for dy in range(-radius_pixels, radius_pixels + 1):
