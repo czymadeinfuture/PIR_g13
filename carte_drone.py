@@ -1398,7 +1398,7 @@ for i in range(2):
         end_x = start_x + taille_section - 1
         start_y = j * taille_section
         end_y = start_y + taille_section - 1
-        drone = Drone_courant(start_x, end_x, start_y, end_y, (i+j+1), canvas)
+        drone = Drone_courant(start_x, end_x, start_y, end_y, (2 * i + j + 1), canvas)
         drones.append(drone)
 
 draw_map(canvas, window_size)
