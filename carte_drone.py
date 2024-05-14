@@ -26,7 +26,7 @@ interval_spawn_dechet = 1
 
 canvas_width = 900
 canvas_height = 900
-window_size = 270
+window_size = 300
 
 # element pour des drones
 dt = 1
@@ -190,8 +190,8 @@ class Drone_courant:
 
     def scan_for_trash(self, canvas):
         radius_pixels = self.scan_radius 
-        center_x = (self.x + 0.5) * pixel_size
-        center_y = (self.y + 0.5) * pixel_size 
+        center_x = int((self.x + 0.5) * pixel_size)
+        center_y = int((self.y + 0.5) * pixel_size) 
 
         for dx in range(-radius_pixels, radius_pixels + 1):
             for dy in range(-radius_pixels, radius_pixels + 1):
