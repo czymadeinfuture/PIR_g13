@@ -7,7 +7,7 @@ import threading
 
 sys.path.append(os.path.expanduser("~/catkin_ws/src/pir/packages/gazebo_project/src"))
 
-import example_command
+import example_command1 as example_command
 
 
 def main():
@@ -16,8 +16,30 @@ def main():
 
     # Définir les waypoints pour chaque robot
     waypoints = [
-        ["warthog_0", [[10.0, 10.0, 0.0], [-10.0, -10.0, 0.0], [0.0, 0.0, 0.0]]],
-        ["warthog_1", [[20.0, 20.0, 0.0], [-20.0, -20.0, 0.0], [0.0, 0.0, 0.0]]],
+        [
+            "intelaero_0",
+            [
+                [10.0, 10.0, 10.0, 0.0, 0.0, 0.0],
+                [-10.0, -10.0, 10.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
+            ],
+        ],
+        [
+            "intelaero_1",
+            [
+                [20.0, 20.0, 10.0, 0.0, 0.0, 0.0],
+                [-20.0, -20.0, 10.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
+            ],
+        ],
+        [
+            "warthog_0",
+            [
+                [20.0, 20.0, 10.0],
+                [-20.0, -20.0, 10.0],
+                [0.0, 0.0, 10.0],
+            ],
+        ],
     ]
 
     # Créer une instance de Algorithm pour chaque robot et démarrer les threads

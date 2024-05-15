@@ -1,16 +1,18 @@
 import copy
+import heapq
 import math
+import os
+import pickle
 import random
 import subprocess
+import sys
 import threading
 import time
-import heapq
 import tkinter as tk
 import tkinter.simpledialog as sd
 from functools import partial
-from tkinter.simpledialog import Dialog
-import pickle
 from tkinter import filedialog
+from tkinter.simpledialog import Dialog
 
 import numpy as np
 import pulp
@@ -111,14 +113,15 @@ def tsp_calculation(nodes_matrix):
     # pr changer de méthode d'approche pr le tsp, changer sole_tsp_dynamic_programming par autre chose
     # par exemplesole_tsp_local_search (voir le github pr ttes les méthodes)
     permutation, distance = solve_tsp_dynamic_programming(distance_matrix_np)
-    #permutation, distance = solve_tsp_local_search(distance_matrix_np)
+    # permutation, distance = solve_tsp_local_search(distance_matrix_np)
 
     # print(permutation, "\n", distance)
 
     return permutation, distance
 
+
 def bresenham(x0, y0, x1, y1):
-    #Génère les points entre (x0, y0) et (x1, y1) en utilisant l'algorithme de Bresenham.
+    # Génère les points entre (x0, y0) et (x1, y1) en utilisant l'algorithme de Bresenham.
     points = []
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)
@@ -139,16 +142,27 @@ def bresenham(x0, y0, x1, y1):
             y0 += sy
     return points
 
+
 def is_obstacle_in_path(grid, path):
-    #Vérifie s'il y a des obstacles (ou des troncs) sur le chemin.
+    # Vérifie s'il y a des obstacles (ou des troncs) sur le chemin.
     for x, y in path:
         if grid[x][y].etage1 == "obstacle" or grid[x][y].etage1 == "tronc":
             return True
     return False
 
+
 def find_detour(grid, start, end):
-    #Trouve un détour si un obstacle est détecté sur le chemin direct.
-    directions = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]  # Inclu les diagnoals pour simplifier les trajets
+    # Trouve un détour si un obstacle est détecté sur le chemin direct.
+    directions = [
+        (0, 1),
+        (1, 0),
+        (0, -1),
+        (-1, 0),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1),
+    ]  # Inclu les diagnoals pour simplifier les trajets
     rows, cols = len(grid), len(grid[0])
     open_set = []
     heapq.heappush(open_set, (0, start))
@@ -162,7 +176,12 @@ def find_detour(grid, start, end):
             break
         for direction in directions:
             neighbor = (current[0] + direction[0], current[1] + direction[1])
-            if 0 <= neighbor[0] < rows and 0 <= neighbor[1] < cols and grid[neighbor[0]][neighbor[1]].etage1 != "obstacle" and grid[neighbor[0]][neighbor[1]].etage1 != "tronc":
+            if (
+                0 <= neighbor[0] < rows
+                and 0 <= neighbor[1] < cols
+                and grid[neighbor[0]][neighbor[1]].etage1 != "obstacle"
+                and grid[neighbor[0]][neighbor[1]].etage1 != "tronc"
+            ):
                 tentative_g_score = g_score[current] + 1
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
@@ -182,8 +201,10 @@ def find_detour(grid, start, end):
     path.append(start)
     return path[::-1]
 
+
 def heuristic(a, b):
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
 
 def connect_points(grid, start, end):
     path = bresenham(start[0], start[1], end[0], end[1])
@@ -193,8 +214,9 @@ def connect_points(grid, start, end):
     # Find detour
     return find_detour(grid, start, end)
 
+
 def simplify_segment(grid, start, end):
-    #Simplifie un segment entre deux points en retirant les points intermédiaires inutiles.
+    # Simplifie un segment entre deux points en retirant les points intermédiaires inutiles.
     path = bresenham(start[0], start[1], end[0], end[1])
     if not is_obstacle_in_path(grid, path):
         return [start, end]
@@ -202,11 +224,17 @@ def simplify_segment(grid, start, end):
     detour_path = find_detour(grid, start, end)
     simplified_path = [detour_path[0]]
     for i in range(2, len(detour_path)):
-        direct_path = bresenham(simplified_path[-1][0], simplified_path[-1][1], detour_path[i][0], detour_path[i][1])
+        direct_path = bresenham(
+            simplified_path[-1][0],
+            simplified_path[-1][1],
+            detour_path[i][0],
+            detour_path[i][1],
+        )
         if is_obstacle_in_path(grid, direct_path):
             simplified_path.append(detour_path[i - 1])
     simplified_path.append(detour_path[-1])
     return simplified_path
+
 
 def find_path_through_points(grid, points):
     full_path = []
@@ -219,6 +247,7 @@ def find_path_through_points(grid, points):
         else:
             full_path.extend(segment_path)
     return full_path
+
 
 def mTSP():
     indices_dechets = []
@@ -247,11 +276,11 @@ def mTSP():
                 trajet.append((i, j))
             if map[i][j].etage1 == "tronc":
                 if j != 0:
-                    if map[i][j-1].etage1!="obstacle":
+                    if map[i][j - 1].etage1 != "obstacle":
                         indices_dechets.append((i, j - 1))
                         trajet.append((i, j - 1))
                 else:
-                    if map[i][j+1].etage1!="obstacle":
+                    if map[i][j + 1].etage1 != "obstacle":
                         indices_dechets.append((i, j + 1))
                         trajet.append((i, j + 1))
     if len(indices_dechets) >= 2 and len(indices_robots) >= 1:
@@ -329,14 +358,14 @@ def mTSP():
                     trajet_par_robot_tsp[robot][i] = trajet_par_robot[robot][
                         permutation[i]
                     ]
-        
+
         # On appelle les algorithmes pour recalculer les trajets en prenant en compte les obstacles
         for robot in trajet_par_robot_tsp:
             ancien_point = trajet[robot - 1]
-            for point in trajet_par_robot_tsp[robot]: 
-                    trajet_temp=trajet_par_robot_tsp[robot]
-                    trajet_par_robot_tsp[robot]=find_path_through_points(map, trajet_temp)
-                            
+            for point in trajet_par_robot_tsp[robot]:
+                trajet_temp = trajet_par_robot_tsp[robot]
+                trajet_par_robot_tsp[robot] = find_path_through_points(map, trajet_temp)
+
         print(f"\nTrajet final par robot : {trajet_par_robot_tsp}")
 
         # afficher les trajets
@@ -443,18 +472,55 @@ def gazebo_delete(type_obj, y=None, x=None):
         print(f"Failed to delete Gazebo model: {e}")
 
 
-def gazebo_deplacer(type_obj, y, x):
-    command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
-    try:
-        subprocess.Popen(
-            command,
-            shell=True,
-            executable="/bin/bash",
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception as e:
-        print(f"Failed to delete Gazebo model: {e}")
+sys.path.append(os.path.expanduser("~/catkin_ws/src/pir/packages/gazebo_project/src"))
+
+
+import example_command1 as example_command  # noqa: E402
+
+
+def gazebo_deplacer(waypoints):
+    # Initialiser le noeud ROS
+    example_command.rospy.init_node("listener", anonymous=True)
+
+    # Définir les waypoints pour chaque robot:sous cette forme
+    # waypoints = [
+    #     [
+    #         "intelaero_0",
+    #         [
+    #             [10.0, 10.0, 10.0, 0.0, 0.0, 0.0],
+    #             [-10.0, -10.0, 10.0, 0.0, 0.0, 0.0],
+    #             [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
+    #         ],
+    #     ],
+    #     [
+    #         "intelaero_1",
+    #         [
+    #             [20.0, 20.0, 10.0, 0.0, 0.0, 0.0],
+    #             [-20.0, -20.0, 10.0, 0.0, 0.0, 0.0],
+    #             [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
+    #         ],
+    #     ],
+    #     [
+    #         "warthog_0",
+    #         [
+    #             [20.0, 20.0, 10.0],
+    #             [-20.0, -20.0, 10.0],
+    #             [0.0, 0.0, 10.0],
+    #         ],
+    #     ],
+    # ]
+
+    # Créer une instance de Algorithm pour chaque robot et démarrer les threads
+    threads = []
+    for robot_name, robot_waypoints in waypoints:
+        algo = example_command.Algorithm(robot_name, robot_waypoints)
+        thread = threading.Thread(target=algo.run)
+        thread.start()
+        threads.append(thread)
+
+    # Attendre que tous les threads soient terminés
+    for thread in threads:
+        thread.join()
 
 
 ###################################################

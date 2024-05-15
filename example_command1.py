@@ -226,14 +226,24 @@ class DRONE(object):
 # =======================================================
 class Algorithm(object):
     def __init__(self, robot_name, waypoints=None):
-        self.drone = DRONE(robot_name)
+        if "warthog" in robot_name:
+            self.warthog = WARTHOG(robot_name)
+            if waypoints is None:
+                # Utilisez les waypoints par défaut si aucun n'est fourni
+                print("pas de waypoints")
+            else:
+                # Utilisez les waypoints fournis
+                self.waypoints_warthog = waypoints
 
-        if waypoints is None:
-            # Utilisez les waypoints par défaut si aucun n'est fourni
-            print("pas de waypoints")
-        else:
-            # Utilisez les waypoints fournis
-            self.waypoints_drone = waypoints
+        elif "intelaero" in robot_name:
+            self.drone = DRONE(robot_name)
+
+            if waypoints is None:
+                # Utilisez les waypoints par défaut si aucun n'est fourni
+                print("pas de waypoints")
+            else:
+                # Utilisez les waypoints fournis
+                self.waypoints_drone = waypoints
 
     # =================================================
     """ Send the waypoint to gazebo   |Dont touch|  """
@@ -271,14 +281,16 @@ class Algorithm(object):
 
     def exemple(self):
         """Drone waypoints"""
-        # for waypoint in self.waypoints_drone:
-        #     print(waypoint)
-        #     self.Send_drone(waypoint)
+        if hasattr(self, "waypoints_drone"):
+            for waypoint in self.waypoints_drone:
+                print(waypoint)
+                self.Send_drone(waypoint)
 
         """ Warthog waypoints  """
-        for waypoint in self.waypoints_warthog:
-            print(waypoint)
-            self.Send_warthog(waypoint)
+        if hasattr(self, "waypoints_warthog"):
+            for waypoint in self.waypoints_warthog:
+                print(waypoint)
+                self.Send_warthog(waypoint)
 
     # ====================================
     """ 	      Run	|Dont touch|	"""
