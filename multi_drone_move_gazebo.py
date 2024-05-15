@@ -301,6 +301,21 @@ class Algorithm(object):
         self.waypoints_warthog = [[0.0,  0.0,  0.0],
                                   [10.0, 0.0,  0.0], 
                                   [5.0,  0.0, 0.0]]
+        
+    def adjust_waypoints(self, waypoints):
+        adjusted_waypoints = []
+        adjustment = map_size // 2
+        for waypoint in waypoints:
+            adjusted_waypoint = [
+                waypoint[0] - adjustment,
+                waypoint[1] - adjustment,
+                waypoint[2],
+                waypoint[3],
+                waypoint[4],
+                waypoint[5]
+            ]
+            adjusted_waypoints.append(adjusted_waypoint)
+        return adjusted_waypoints
     
     # =================================================
     """ Send the waypoint to gazebo   |Dont touch|  """
@@ -337,7 +352,8 @@ class Algorithm(object):
     def exemple(self):
         """ Drone waypoints  """   
         for drone_index, drone in enumerate(self.drones):
-            for waypoint in drone.waypoints:
+            adjusted_waypoints = self.adjust_waypoints(drone.waypoints)
+            for waypoint in adjusted_waypoints:
                 # print(f"Drone {drone_index} waypoint: {waypoint}")
                 self.Send_drone(waypoint, drone_index)
 
