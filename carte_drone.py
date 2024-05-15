@@ -95,7 +95,7 @@ class Drone_courant:
         self.canvas = canvas
 
         # parametre pour le scan
-        self.scan_radius = 55
+        self.scan_radius = int(pixel_size * 1.2)
 
         # taille de drone
         self.drone_size =  pixel_size * 0.2 
