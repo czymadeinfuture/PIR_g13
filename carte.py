@@ -4,6 +4,7 @@ import random
 import subprocess
 import threading
 import time
+import heapq
 import tkinter as tk
 import tkinter.simpledialog as sd
 from functools import partial
@@ -116,54 +117,108 @@ def tsp_calculation(nodes_matrix):
 
     return permutation, distance
 
-
-def bresenham_line(x0, y0, x1, y1):
-     # Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
-    
+def bresenham(x0, y0, x1, y1):
+    """Génère les points entre (x0, y0) et (x1, y1) en utilisant l'algorithme de Bresenham."""
     points = []
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)
-    sx = -1 if x0 > x1 else 1
-    sy = -1 if y0 > y1 else 1
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
     err = dx - dy
 
-    while x0 != x1 or y0 != y1:
+    while True:
         points.append((x0, y0))
-        e2 = 2 * err
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = err * 2
         if e2 > -dy:
             err -= dy
             x0 += sx
         if e2 < dx:
             err += dx
             y0 += sy
-
-    points.append((x1, y1))
     return points
 
+def is_obstacle_in_path(grid, path):
+    """Vérifie s'il y a des obstacles sur le chemin."""
+    for x, y in path:
+        if grid[x][y].etage1 == "obstacle" or grid[x][y].etage1 == "tronc":
+            return True
+    return False
 
-def has_obstacle(matrix, x0, y0, x1, y1):
-   
-    # Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
-    
-    line = bresenham_line(x0, y0, x1, y1)
-    for x, y in line:
-        if matrix[x][y].etage1 == "obstacle" or matrix[x][y].etage1 == "tronc":  # Obstacle dans la matrice
-            return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
-    return (
-        False,
-        None,
-    )  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
+def find_detour(grid, start, end):
+    """Trouve un détour si un obstacle est détecté sur le chemin direct."""
+    directions = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]  # Including diagonals
+    rows, cols = len(grid), len(grid[0])
+    open_set = []
+    heapq.heappush(open_set, (0, start))
+    came_from = {}
+    g_score = {start: 0}
+    f_score = {start: heuristic(start, end)}
 
-def plus_proche(x, y, z):
-    # Calculer les différences absolues entre x et y, et entre x et z
-    diff_xy = abs(x - y)
-    diff_xz = abs(x - z)
-    
-    # Comparer les différences et retourner le nombre le plus proche de x
-    if diff_xy < diff_xz:
-        return y
-    else:
-        return z
+    while open_set:
+        _, current = heapq.heappop(open_set)
+        if current == end:
+            break
+        for direction in directions:
+            neighbor = (current[0] + direction[0], current[1] + direction[1])
+            if 0 <= neighbor[0] < rows and 0 <= neighbor[1] < cols and grid[neighbor[0]][neighbor[1]].etage1 != "obstacle" and grid[neighbor[0]][neighbor[1]].etage1 != "tronc":
+                tentative_g_score = g_score[current] + 1
+                if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = tentative_g_score + heuristic(neighbor, end)
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
+
+    if end not in came_from:
+        return []
+
+    # Reconstruct path
+    path = []
+    current = end
+    while current in came_from:
+        path.append(current)
+        current = came_from[current]
+    path.append(start)
+    return path[::-1]
+
+def heuristic(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+def connect_points(grid, start, end):
+    path = bresenham(start[0], start[1], end[0], end[1])
+    if not is_obstacle_in_path(grid, path):
+        return path
+
+    # Find detour
+    return find_detour(grid, start, end)
+
+def simplify_segment(grid, start, end):
+    """Simplifie un segment entre deux points en retirant les points intermédiaires inutiles."""
+    path = bresenham(start[0], start[1], end[0], end[1])
+    if not is_obstacle_in_path(grid, path):
+        return [start, end]
+
+    detour_path = find_detour(grid, start, end)
+    simplified_path = [detour_path[0]]
+    for i in range(2, len(detour_path)):
+        direct_path = bresenham(simplified_path[-1][0], simplified_path[-1][1], detour_path[i][0], detour_path[i][1])
+        if is_obstacle_in_path(grid, direct_path):
+            simplified_path.append(detour_path[i - 1])
+    simplified_path.append(detour_path[-1])
+    return simplified_path
+
+def find_path_through_points(grid, points):
+    full_path = []
+    for i in range(len(points) - 1):
+        segment_path = simplify_segment(grid, points[i], points[i + 1])
+        if not segment_path:
+            return []  # Si un segment est infranchissable, retourner une liste vide
+        if full_path:
+            full_path.extend(segment_path[1:])  # Éviter de dupliquer les points
+        else:
+            full_path.extend(segment_path)
+    return full_path
 
 def mTSP():
     indices_dechets = []
@@ -192,11 +247,13 @@ def mTSP():
                 trajet.append((i, j))
             if map[i][j].etage1 == "tronc":
                 if j != 0:
-                    indices_dechets.append((i, j - 1))
-                    trajet.append((i, j - 1))
+                    if map[i][j-1].etage1!="obstacle":
+                        indices_dechets.append((i, j - 1))
+                        trajet.append((i, j - 1))
                 else:
-                    indices_dechets.append((i, j + 1))
-                    trajet.append((i, j + 1))
+                    if map[i][j+1].etage1!="obstacle":
+                        indices_dechets.append((i, j + 1))
+                        trajet.append((i, j + 1))
     if len(indices_dechets) >= 2 and len(indices_robots) >= 1:
         ################################################
         # Building distance matrix
@@ -272,49 +329,12 @@ def mTSP():
                     trajet_par_robot_tsp[robot][i] = trajet_par_robot[robot][
                         permutation[i]
                     ]
-        test=1
-        while test!=0:
-            test=0
-            for robot in trajet_par_robot_tsp:
-                compteur_index=0
-                ancien_point = trajet[robot - 1]
-                for point in trajet_par_robot_tsp[robot]: 
-                        obstacle_found, obstacle_coords = has_obstacle(map, ancien_point[0], ancien_point[1], point[0], point[1])
-                        if obstacle_found:
-                            if abs(ancien_point[0]-point[0])<=abs(ancien_point[1]-point[1]):
-                                if (plus_proche(obstacle_coords[0],ancien_point[0],point[0])==ancien_point[0] or obstacle_coords[0]==0) and obstacle_coords[0]<taille_carte:
-                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))
-                                    nouvelle_coord=(obstacle_coords[0]+1,obstacle_coords[1])
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord
-                                    
-                                #elif ((plus_proche(obstacle_coords[0],ancien_point[0],point[0])==point[0]) or obstacle_coords[0]==taille_carte-1):  
-                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))  
-                                    #nouvelle_coord=(obstacle_coords[0]-1,obstacle_coords[1])
-                                    #trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    #ancien_point = nouvelle_coord
-                                
-                                else:    
-                                    nouvelle_coord=(obstacle_coords[0]-1,obstacle_coords[1])
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord
-                            else:        
-                                if (plus_proche(obstacle_coords[1],ancien_point[1],point[1])==ancien_point[1] or obstacle_coords[1]==0) and obstacle_coords[0]<taille_carte:
-                                    #print("Le nombre le plus proche de",obstacle_coords[0] , "est",plus_proche(obstacle_coords[0],ancien_point[0],point[0]))
-                                    nouvelle_coord=(obstacle_coords[0],obstacle_coords[1]+1)
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord
-                                else:    
-                                    nouvelle_coord=(obstacle_coords[0],obstacle_coords[1]-1)
-                                    trajet_par_robot_tsp[robot].insert(compteur_index,nouvelle_coord)
-                                    ancien_point = nouvelle_coord    
-                                    
-                            print("Il y a un obstacle sur la ligne aux coordonnées :", obstacle_coords)
-                            test+=1
-                        else:
-                            print("Il n'y a pas d'obstacle sur la ligne.")
-                            ancien_point = point
-                        compteur_index+=1
+        
+        for robot in trajet_par_robot_tsp:
+            ancien_point = trajet[robot - 1]
+            for point in trajet_par_robot_tsp[robot]: 
+                    trajet_temp=trajet_par_robot_tsp[robot]
+                    trajet_par_robot_tsp[robot]=find_path_through_points(map, trajet_temp)
                             
         print(f"\nTrajet final par robot : {trajet_par_robot_tsp}")
 
