@@ -21,15 +21,21 @@ from python_tsp.exact import solve_tsp_dynamic_programming
 # initialisation
 ###################################################
 
-taille_carte = 20
+taille_carte = 18
 interval_spawn_dechet = 1
 
-canvas_width = 700
-canvas_height = 700
-window_size = 200
+canvas_width = 900
+canvas_height = 900
+window_size = 300
 
+# element pour des drones
+dt = 1
+taille_section = taille_carte // 2
+taille_bloc = 3
+nb = taille_section//taille_bloc
+
+#
 lines = []
-
 
 class Cellule:
     def __init__(
@@ -64,12 +70,274 @@ class Drone:
         self.y = y
         self.z = z
 
+class Drone_courant:
+    def __init__(self,start_x, end_x, start_y, end_y, id, canvas):
+
+        self.id = id
+
+        # positions possibles pour chaque drone dans san zone 
+        self.list = self.init_list(start_x,start_y)
+
+        # noter les points qui sont visites par chaque drone
+        self.waypoints= []
+
+        # zone de detection
+        self.start_x = start_x
+        self.end_x = end_x
+        self.start_y = start_y
+        self.end_y = end_y
+
+        self.canvas = canvas
+
+        # parametre pour le scan
+        self.scan_radius = int(pixel_size * 1.2)
+
+        # taille de drone
+        self.drone_size =  pixel_size * 0.2 
+
+        # position initiale
+        self.x, self.y = self.init_position()
+
+        self.target_x, self.target_y = self.x, self.y
+        self.moving = False
+
+        self.path = []
+
+        # une matrice pour stocker le nb de visite
+        self.visited = [[0]*nb for _ in range(nb)]
+
+        # une liste pour stocker les positions de dechets
+        self.trash_found = []
+
+        # registrer seulement les positions des arebres et des obstacles dans la matrice de map
+        self.map_copy= [[0] * taille_carte for _ in range(taille_carte)]  
+        self.init_map_copy()
+
+        # une matrice pour stocker l'heure de la derniere visite
+        self.visited_time = [[0]*taille_carte for _ in range(taille_carte)]
+
+        # la direction du mouvement de la drone
+        self.last_direction = None 
+
+        self.min_visit = 0
+
+        # parametre pour controler le statue du mouvement
+        self.paused = False
+
+        # parametre pour controler la ferme de le processus
+        self.should_run = True
+
+        self.lock = threading.Lock() 
+
+
+    def initial_scan(self, canvas):
+        self.scan_for_trash(canvas)
+
+    def init_map_copy(self):
+        for y in range(self.start_y, self.end_y + 1):
+            for x in range(self.start_x, self.end_x + 1):
+                if map_data[y][x] in (1, 2):  
+                    self.map_copy[y][x] = map_data[y][x]
+
+    def all_covered(self):
+        for y in range(nb):
+            for x in range(nb):
+                if self.visited[y][x] == self.min_visit:
+                    return False
+        return True
+
+    def init_list(self,start_x,start_y):
+        list = []
+        for i in range(nb):
+            for j in range(nb):
+                list.append((start_x+i*taille_bloc+1,start_y+j*taille_bloc+1))
+        return list
+
+    def init_position(self):
+        x,y = random.choice(self.list)
+        self.waypoints.append((x,y))
+        return x,y
+
+    
+    def draw_drone(self, canvas):
+        tag = f"drone{self.start_x}-{self.start_y}"
+        center_x = (self.x + 0.5) * pixel_size
+        center_y = (self.y + 0.5) * pixel_size
+        self.path.append((center_x, center_y))
+        canvas.delete(tag)
+
+        # dessine de drones
+        margin = pixel_size // 2.5
+        radius = pixel_size // 3.5
+        for dx in [0.15, 0.85]:
+            for dy in [0.15, 0.85]:
+                canvas.create_oval(
+                    (self.x + dx) * pixel_size - radius + margin,
+                    (self.y + dy) * pixel_size - radius + margin,
+                    (self.x+ dx) * pixel_size + radius - margin,
+                    (self.y + dy) * pixel_size + radius - margin,
+                    fill="#FFB200",
+                    tags=tag,
+                )
+
+        # dessine de zone scanne
+        canvas.create_oval(
+            center_x - self.scan_radius, center_y - self.scan_radius,
+            center_x + self.scan_radius, center_y + self.scan_radius,
+            outline="#FFD700", width=2, tags=tag
+        )
+
+
+    def scan_for_trash(self, canvas):
+        radius_pixels = self.scan_radius 
+        center_x = int((self.x + 0.5) * pixel_size)
+        center_y = int((self.y + 0.5) * pixel_size) 
+
+        for dx in range(-radius_pixels, radius_pixels + 1):
+            for dy in range(-radius_pixels, radius_pixels + 1):
+                if dx**2 + dy**2 < radius_pixels**2:  
+                    pixel_x = center_x + dx
+                    pixel_y = center_y + dy
+                    grid_x = int((pixel_x // pixel_size))
+                    grid_y = int((pixel_y // pixel_size))
+                    if (0 <= grid_x < taille_carte and 0 <= grid_y < taille_carte) and (pixel_x % pixel_size != 0 and pixel_y % pixel_size != 0):
+                        item_id = canvas.find_closest(pixel_x, pixel_y)
+                        item_color = canvas.itemcget(item_id, "fill")
+                        if self.map_copy[grid_y][grid_x] == 0 and item_color == COLORS["trash"]:
+                            if (grid_x, grid_y) not in self.trash_found:  
+                                self.trash_found.append((grid_x, grid_y))
+                                print(f"DRONE {self.id} finds trash at position: ({grid_x+1}, {grid_y+1})")
+
+    # utiliser algo nc-drone-ts pour décider la position suivante
+    def start_move(self):
+        if not self.moving:
+            min_visits = float('inf')
+            best_directions = []
+            directions = {
+                'up': (0, -3),
+                'down': (0, 3),
+                'left': (-3, 0),
+                'right': (3, 0)
+            }
+
+            for direction, (dx, dy) in directions.items():
+                nx, ny = self.x + dx, self.y + dy
+                if self.start_x <= nx <= self.end_x and self.start_y <= ny <= self.end_y:  
+                    visits = self.visited[(ny-self.start_y)//taille_bloc][(nx-self.start_x)//taille_bloc]
+                    last_time = self.visited_time[ny][nx]
+                    nb_obstacles = block_counts[ny // taille_bloc][nx // taille_bloc]
+
+                    if (visits < min_visits or 
+                        (visits == min_visits and nb_obstacles < min_obstacles) or
+                        (visits == min_visits and nb_obstacles == min_obstacles and last_time < oldest_time)):
+                        min_visits = visits
+                        min_obstacles = nb_obstacles
+                        oldest_time = last_time
+                        best_directions = [direction]
+                    elif visits == min_visits and nb_obstacles == min_obstacles and last_time == oldest_time:
+                        best_directions.append(direction)
+
+            if best_directions:
+                if self.last_direction in best_directions:
+                    best_direction = self.last_direction
+                else:
+                    best_direction = random.choice(best_directions)  
+
+                self.last_direction = best_direction
+
+            if best_direction == "up" and self.y > 0:
+                self.target_y -= taille_bloc
+            elif best_direction == "down" and self.y < taille_carte - 1:
+                self.target_y += taille_bloc
+            elif best_direction == "left" and self.x > 0:
+                self.target_x -= taille_bloc
+            elif best_direction == "right" and self.x < taille_carte - 1:
+                self.target_x += taille_bloc
+            else:
+                return  
+            self.vx = 0.20 if self.x < self.target_x else -0.20 if self.x > self.target_x else 0
+            self.vy = 0.20 if self.y < self.target_y else -0.20 if self.y > self.target_y else 0
+            self.moving = True
+            self.visited[(self.y-self.start_y)// taille_bloc][(self.x-self.start_x) // taille_bloc] += 1
+            self.visited_time[self.y][self.x]= time.time()
+            self.waypoints.append((self.target_x,self.target_y))
+
+    # faire le mouvement
+    def move_to_target(self, canvas): 
+        if self.moving:
+            if (round(self.x, 1) != self.target_x) or (round(self.y, 1) != self.target_y):
+                self.x += self.vx * dt
+                self.y += self.vy * dt
+            else:
+                self.x = self.target_x
+                self.y = self.target_y
+                self.moving = False                
+                self.scan_for_trash(canvas) 
+
+            self.draw_drone(canvas)
+            root.after(10, lambda: self.move_to_target(canvas))
+            self.update_gui()
+    
+    def pause(self):
+        with self.lock:
+            self.paused = True
+
+    def restart(self):
+        with self.lock:
+            if self.paused:
+                self.paused = False
+                if not self.moving:
+                    threading.Thread(target=self.run).start()
+
+    def run(self):
+        self.initial_scan(self.canvas)
+        while self.should_run and not self.paused:
+            if not self.moving:
+                self.start_move()
+                self.move_to_target(self.canvas)
+                if self.all_covered():
+                    self.min_visit += 1
+                    time.sleep(2)  
+                else:
+                    time.sleep(0.2) 
+            else:
+                time.sleep(0.2) 
+            if not self.should_run: 
+                break
+
+    #arreter le processus
+    def stop(self):
+        self.should_run = False
+
+    def update_gui(self):
+        self.canvas.after(0, self.draw_drone, self.canvas)
+
 
 def init_map(num):  # initialisation de la carte
     return [[Cellule() for _ in range(num)] for _ in range(num)]
 
+# ----------------- todo ----------
+# Il faut faire la connaissance de la carte (positions des obstacle et des arbres)
+def init_map_drone(num):
+    map_data = [[0]*num for _ in range(num)]
+
+    #ajouter des positions des obstacle et des arbres
+    
+    block_counts = [[0] * (taille_carte//taille_bloc) for _ in range(taille_carte//taille_bloc)]
+    for y in range(taille_carte//taille_bloc):
+        for x in range(taille_carte//taille_bloc):
+            count = sum(1 for dy in range(taille_bloc)
+                        for dx in range(taille_bloc)
+                        if map_data[y * taille_bloc + dy][x * taille_bloc + dx] in {1, 2})
+            block_counts[y][x] = count
+
+    return map_data,block_counts
+
+
+##################################################
 
 map = init_map(taille_carte)
+map_data,block_counts = init_map_drone(taille_carte)
 pixel_size = 3 * window_size // len(map)
 
 COLORS = {  # couleurs des cases
@@ -82,6 +350,35 @@ COLORS = {  # couleurs des cases
     "drone": "#FFB200",
     "blue": "#0000FF",
 }
+
+
+###################################################
+### pour les drones
+###################################################
+
+def draw_drones(canvas):
+    for drone in drones:
+        drone.draw_drone(canvas)
+
+
+def pause_drones():
+    for drone in drones:
+        drone.pause()
+
+def start_drones():
+    for drone in drones:
+        if not drone.moving and not drone.paused:
+            drone_thread = threading.Thread(target=drone.run)
+            drone_thread.start()
+        elif drone.paused:
+            drone.restart()
+
+def stop_all_drones_and_exit():
+    for drone in drones:
+        drone.stop() 
+    root.destroy() 
+
+
 
 ###################################################
 ### mTSP
@@ -114,6 +411,7 @@ def tsp_calculation(nodes_matrix):
 
     return permutation, distance
 
+
 def bresenham_line(x0, y0, x1, y1):
     """
     Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
@@ -138,6 +436,7 @@ def bresenham_line(x0, y0, x1, y1):
     points.append((x1, y1))
     return points
 
+
 def has_obstacle(matrix, x0, y0, x1, y1):
     """
     Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
@@ -146,7 +445,10 @@ def has_obstacle(matrix, x0, y0, x1, y1):
     for x, y in line:
         if matrix[x][y].etage1 == "obstacle":  # Obstacle dans la matrice
             return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
-    return False, None  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
+    return (
+        False,
+        None,
+    )  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
 
 
 def mTSP():
@@ -368,30 +670,61 @@ def draw_pixel_feuillage(
 def draw_pixel_drone(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un drone
-    margin = pixel_size // 3
-    canvas.create_oval(
-        x * pixel_size + margin,
-        y * pixel_size + margin,
-        (x + 1) * pixel_size - margin,
-        (y + 1) * pixel_size - margin,
-        fill=color,
-        tags=tag,
-    )
+    margin = pixel_size // 2.5
+    radius = pixel_size // 3.5
+    for dx in [0.15, 0.85]:
+        for dy in [0.15, 0.85]:
+            canvas.create_oval(
+                (x + dx) * pixel_size - radius + margin,
+                (y + dy) * pixel_size - radius + margin,
+                (x + dx) * pixel_size + radius - margin,
+                (y + dy) * pixel_size + radius - margin,
+                fill=color,
+                tags=tag,
+            )
 
 
 def draw_pixel_robot(
     canvas, x, y, color, pixel_size, tag
 ):  # dessin d'un pixel sous un robot
     margin = pixel_size // 4
-    canvas.create_polygon(
+    width = pixel_size // 10
+    # Draw black outline
+    canvas.create_line(
         x * pixel_size + margin,
-        (y + 1) * pixel_size - margin,
+        y * pixel_size + margin,
         (x + 1) * pixel_size - margin,
         (y + 1) * pixel_size - margin,
-        (x + 0.5) * pixel_size,
+        fill="black",
+        width=width * 2,
+        tags=tag,
+    )
+    canvas.create_line(
+        (x + 1) * pixel_size - margin,
         y * pixel_size + margin,
+        x * pixel_size + margin,
+        (y + 1) * pixel_size - margin,
+        fill="black",
+        width=width * 2,
+        tags=tag,
+    )
+    # Draw colored line
+    canvas.create_line(
+        x * pixel_size + margin,
+        y * pixel_size + margin,
+        (x + 1) * pixel_size - margin,
+        (y + 1) * pixel_size - margin,
         fill=color,
-        outline="black",
+        width=width,
+        tags=tag,
+    )
+    canvas.create_line(
+        (x + 1) * pixel_size - margin,
+        y * pixel_size + margin,
+        x * pixel_size + margin,
+        (y + 1) * pixel_size - margin,
+        fill=color,
+        width=width,
         tags=tag,
     )
 
@@ -990,7 +1323,7 @@ def filter_objects_by_name(objects_list, name):
     return [obj for obj in objects_list if name in obj]
 
 
-def reset_grid():  # réinitialisation de la grille
+def reset_grid(tout=False):  # réinitialisation de la grille
     for y in range(len(map)):
         for x in range(len(map[y])):
             change_to_void(x, y)
@@ -1050,6 +1383,26 @@ def bouton(
 
 
 root = tk.Tk()
+canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
+
+canvas.grid(row=3, column=0, columnspan=2)  
+
+canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill="white")
+
+
+drones = []
+
+for i in range(2):
+    for j in range(2):
+        start_x = i * taille_section
+        end_x = start_x + taille_section - 1
+        start_y = j * taille_section
+        end_y = start_y + taille_section - 1
+        drone = Drone_courant(start_x, end_x, start_y, end_y, (2 * i + j + 1), canvas)
+        drones.append(drone)
+
+draw_map(canvas, window_size)
+draw_drones(canvas)
 
 trash_button = bouton("Déchet au hasard", place_random_trash, "black")
 trash_button.grid(row=0, column=0, sticky="w")
@@ -1063,13 +1416,21 @@ trash_cycle_button.grid(row=2, column=0, sticky="w")
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
 tree_button.grid(row=0, column=1, sticky="e")
 
-reset_button = bouton("Réinitialiser", reset_grid, "red")
+reset_button = bouton("Réinitialiser environnement", reset_grid, "red")
 reset_button.grid(row=1, column=1, sticky="e")
+reset2_button = bouton("Réinitialiser tout", reset_grid, "red")
+reset2_button.grid(row=2, column=1, sticky="e")
 
-canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
-canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
 
-canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill="white")
+smooth_move_button = bouton("Move", start_drones)
+smooth_move_button.grid(row=0, column=0, sticky="e")  
 
-draw_map(canvas, window_size)
+pause_button = bouton("Pause", pause_drones)
+pause_button.grid(row=1, column=0,  sticky="e")
+
+stop_button = bouton("Stop and Exit", stop_all_drones_and_exit)
+stop_button.grid(row=2, column=0, sticky="e")
+
+
+
 root.mainloop()
