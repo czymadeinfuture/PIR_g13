@@ -118,7 +118,7 @@ def tsp_calculation(nodes_matrix):
     return permutation, distance
 
 def bresenham(x0, y0, x1, y1):
-    """Génère les points entre (x0, y0) et (x1, y1) en utilisant l'algorithme de Bresenham."""
+    #Génère les points entre (x0, y0) et (x1, y1) en utilisant l'algorithme de Bresenham.
     points = []
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)
@@ -140,15 +140,15 @@ def bresenham(x0, y0, x1, y1):
     return points
 
 def is_obstacle_in_path(grid, path):
-    """Vérifie s'il y a des obstacles sur le chemin."""
+    #Vérifie s'il y a des obstacles (ou des troncs) sur le chemin.
     for x, y in path:
         if grid[x][y].etage1 == "obstacle" or grid[x][y].etage1 == "tronc":
             return True
     return False
 
 def find_detour(grid, start, end):
-    """Trouve un détour si un obstacle est détecté sur le chemin direct."""
-    directions = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]  # Including diagonals
+    #Trouve un détour si un obstacle est détecté sur le chemin direct.
+    directions = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]  # Inclu les diagnoals pour simplifier les trajets
     rows, cols = len(grid), len(grid[0])
     open_set = []
     heapq.heappush(open_set, (0, start))
@@ -194,7 +194,7 @@ def connect_points(grid, start, end):
     return find_detour(grid, start, end)
 
 def simplify_segment(grid, start, end):
-    """Simplifie un segment entre deux points en retirant les points intermédiaires inutiles."""
+    #Simplifie un segment entre deux points en retirant les points intermédiaires inutiles.
     path = bresenham(start[0], start[1], end[0], end[1])
     if not is_obstacle_in_path(grid, path):
         return [start, end]
@@ -330,6 +330,7 @@ def mTSP():
                         permutation[i]
                     ]
         
+        # On appelle les algorithmes pour recalculer les trajets en prenant en compte les obstacles
         for robot in trajet_par_robot_tsp:
             ancien_point = trajet[robot - 1]
             for point in trajet_par_robot_tsp[robot]: 
