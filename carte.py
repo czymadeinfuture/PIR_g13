@@ -341,7 +341,7 @@ def mTSP():
             "Distance totale minimale parcourue par tous les robots :",
             pulp.value(prob.objective),
         )
-
+        global trajet_par_robot_tsp
         trajet_par_robot_tsp = copy.deepcopy(trajet_par_robot)
         for robot in trajet_par_robot:
             nodes_matrix = trajet_par_robot[robot]
@@ -478,10 +478,27 @@ sys.path.append(os.path.expanduser("~/catkin_ws/src/pir/packages/gazebo_project/
 import example_command1 as example_command  # noqa: E402
 
 
-def gazebo_deplacer(waypoints):
+def transform_dict_to_list(d, robot_list):
+    result = []
+    for key, value in d.items():
+        inner_list = []
+        for v in value:
+            inner_list.append(
+                [
+                    -(float(v[0] - taille_carte // 2)),
+                    -(float(v[1] - taille_carte // 2)),
+                    0.0,
+                ]
+            )
+        result.append([robot_list[key - 1], inner_list])
+    return result
+
+
+def gazebo_deplacer(old_waypoints):
     # Initialiser le noeud ROS
     example_command.rospy.init_node("listener", anonymous=True)
-
+    waypoints = transform_dict_to_list(old_waypoints, liste_robots)
+    print(waypoints)
     # Définir les waypoints pour chaque robot:sous cette forme
     # waypoints = [
     #     [
@@ -778,6 +795,7 @@ def retirer_drone(x, y):
 def retirer_robot(x, y):
     if map[y][x].robot is not None:
         map[y][x].robot = None
+        liste_robots.remove(f"warthog_{x}_{y}")
         try:
             gazebo_delete("warthog", x, y)
         except Exception as e:
@@ -1142,9 +1160,16 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
     mTSP()
 
 
+global liste_robots
+liste_robots = []
+
+
 def change_to_robot(x, y):  # changement d'un pixel en robot
     change_color(x, y, 3, "robot")
+    if f"warthog_{x}_{y}" not in liste_robots:
+        liste_robots.append(f"warthog_{y}_{x}")
     gazebo("warthog", x, y)
+    print(liste_robots)
     mTSP()
 
 
@@ -1322,6 +1347,10 @@ open_file_button = bouton("Ouvrir fichier", open_file_dialog, "blue")
 open_file_button.grid(row=4, column=0, columnspan=2, sticky="nsew")
 export_button = bouton("Exporter fichier", export_file_dialog, "blue")
 export_button.grid(row=5, column=0, columnspan=2, sticky="nsew")
+start_button = bouton(
+    "Démarrer", lambda: gazebo_deplacer(trajet_par_robot_tsp), "green"
+)
+start_button.grid(row=6, column=0, columnspan=2, sticky="nsew")
 
 canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 canvas.grid(row=3, column=0, columnspan=2)  # Use grid here

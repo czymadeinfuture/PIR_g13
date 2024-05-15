@@ -16,32 +16,8 @@ def main():
 
     # Définir les waypoints pour chaque robot
     waypoints = [
-        [
-            "intelaero_0",
-            [
-                [10.0, 10.0, 10.0, 0.0, 0.0, 0.0],
-                [-10.0, -10.0, 10.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
-            ],
-        ],
-        [
-            "intelaero_1",
-            [
-                [20.0, 20.0, 10.0, 0.0, 0.0, 0.0],
-                [-20.0, -20.0, 10.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
-            ],
-        ],
-        [
-            "warthog_0",
-            [
-                [20.0, 20.0, 10.0],
-                [-20.0, -20.0, 10.0],
-                [0.0, 0.0, 10.0],
-            ],
-        ],
+        ["warthog_15_16", [[15.0, 16.0, 0.0], [2.0, 2.0, 0.0], [5.0, 1.0, 0.0]]]
     ]
-
     # Créer une instance de Algorithm pour chaque robot et démarrer les threads
     threads = []
     for robot_name, robot_waypoints in waypoints:
