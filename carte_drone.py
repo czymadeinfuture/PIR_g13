@@ -1,21 +1,25 @@
+import copy
+import heapq
+import math
+import os
+import pickle
 import random
 import subprocess
+import sys
 import threading
 import time
 import tkinter as tk
-from functools import partial
 import tkinter.simpledialog as sd
-import tkinter as tk
+from functools import partial
+from tkinter import filedialog
 from tkinter.simpledialog import Dialog
-import math
-import pulp
-import numpy as np
-from geopy import distance as dis
-from colorama import Fore, Style
-import copy
-from python_tsp.heuristics import solve_tsp_local_search
-from python_tsp.exact import solve_tsp_dynamic_programming
 
+import numpy as np
+import pulp
+from colorama import Fore, Style
+from geopy import distance as dis
+from python_tsp.exact import solve_tsp_dynamic_programming
+from python_tsp.heuristics import solve_tsp_local_search
 
 ###################################################
 # initialisation
@@ -26,7 +30,7 @@ interval_spawn_dechet = 1
 
 canvas_width = 900
 canvas_height = 900
-window_size = 300
+window_size = 270
 
 # element pour des drones
 dt = 1
@@ -34,8 +38,9 @@ taille_section = taille_carte // 2
 taille_bloc = 3
 nb = taille_section//taille_bloc
 
-#
+##########
 lines = []
+
 
 class Cellule:
     def __init__(
@@ -90,7 +95,7 @@ class Drone_courant:
         self.canvas = canvas
 
         # parametre pour le scan
-        self.scan_radius = int(pixel_size * 1.2)
+        self.scan_radius = 55
 
         # taille de drone
         self.drone_size =  pixel_size * 0.2 
@@ -191,7 +196,7 @@ class Drone_courant:
     def scan_for_trash(self, canvas):
         radius_pixels = self.scan_radius 
         center_x = int((self.x + 0.5) * pixel_size)
-        center_y = int((self.y + 0.5) * pixel_size) 
+        center_y = int((self.y + 0.5) * pixel_size)
 
         for dx in range(-radius_pixels, radius_pixels + 1):
             for dy in range(-radius_pixels, radius_pixels + 1):
@@ -207,6 +212,8 @@ class Drone_courant:
                             if (grid_x, grid_y) not in self.trash_found:  
                                 self.trash_found.append((grid_x, grid_y))
                                 print(f"DRONE {self.id} finds trash at position: ({grid_x+1}, {grid_y+1})")
+                                print(pixel_x,pixel_y)
+                                
 
     # utiliser algo nc-drone-ts pour décider la position suivante
     def start_move(self):
@@ -312,11 +319,11 @@ class Drone_courant:
     def update_gui(self):
         self.canvas.after(0, self.draw_drone, self.canvas)
 
-
 def init_map(num):  # initialisation de la carte
     return [[Cellule() for _ in range(num)] for _ in range(num)]
-
-# ----------------- todo ----------
+#######################################
+# ---------------- todo ------------- #
+#######################################
 # Il faut faire la connaissance de la carte (positions des obstacle et des arbres)
 def init_map_drone(num):
     map_data = [[0]*num for _ in range(num)]
@@ -332,9 +339,6 @@ def init_map_drone(num):
             block_counts[y][x] = count
 
     return map_data,block_counts
-
-
-##################################################
 
 map = init_map(taille_carte)
 map_data,block_counts = init_map_drone(taille_carte)
@@ -379,7 +383,6 @@ def stop_all_drones_and_exit():
     root.destroy() 
 
 
-
 ###################################################
 ### mTSP
 ###################################################
@@ -406,49 +409,140 @@ def tsp_calculation(nodes_matrix):
     # pr changer de méthode d'approche pr le tsp, changer sole_tsp_dynamic_programming par autre chose
     # par exemplesole_tsp_local_search (voir le github pr ttes les méthodes)
     permutation, distance = solve_tsp_dynamic_programming(distance_matrix_np)
+    # permutation, distance = solve_tsp_local_search(distance_matrix_np)
 
     # print(permutation, "\n", distance)
 
     return permutation, distance
 
 
-def bresenham_line(x0, y0, x1, y1):
-    """
-    Implémente l'algorithme de Bresenham pour tracer une ligne entre deux points.
-    """
+def bresenham(x0, y0, x1, y1):
+    # Génère les points entre (x0, y0) et (x1, y1) en utilisant l'algorithme de Bresenham.
     points = []
     dx = abs(x1 - x0)
     dy = abs(y1 - y0)
-    sx = -1 if x0 > x1 else 1
-    sy = -1 if y0 > y1 else 1
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
     err = dx - dy
 
-    while x0 != x1 or y0 != y1:
+    while True:
         points.append((x0, y0))
-        e2 = 2 * err
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = err * 2
         if e2 > -dy:
             err -= dy
             x0 += sx
         if e2 < dx:
             err += dx
             y0 += sy
-
-    points.append((x1, y1))
     return points
 
 
-def has_obstacle(matrix, x0, y0, x1, y1):
-    """
-    Vérifie la présence d'obstacles entre deux points dans une matrice 2D.
-    """
-    line = bresenham_line(x0, y0, x1, y1)
-    for x, y in line:
-        if matrix[x][y].etage1 == "obstacle":  # Obstacle dans la matrice
-            return True, (x, y)  # Retourne True et les coordonnées de l'obstacle
-    return (
-        False,
-        None,
-    )  # Si aucun obstacle n'est rencontré, retourne False et None pour les coordonnées de l'obstacle
+def is_obstacle_in_path(grid, path):
+    # Vérifie s'il y a des obstacles (ou des troncs) sur le chemin.
+    for x, y in path:
+        if grid[x][y].etage1 == "obstacle" or grid[x][y].etage1 == "tronc":
+            return True
+    return False
+
+
+def find_detour(grid, start, end):
+    # Trouve un détour si un obstacle est détecté sur le chemin direct.
+    directions = [
+        (0, 1),
+        (1, 0),
+        (0, -1),
+        (-1, 0),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1),
+    ]  # Inclu les diagnoals pour simplifier les trajets
+    rows, cols = len(grid), len(grid[0])
+    open_set = []
+    heapq.heappush(open_set, (0, start))
+    came_from = {}
+    g_score = {start: 0}
+    f_score = {start: heuristic(start, end)}
+
+    while open_set:
+        _, current = heapq.heappop(open_set)
+        if current == end:
+            break
+        for direction in directions:
+            neighbor = (current[0] + direction[0], current[1] + direction[1])
+            if (
+                0 <= neighbor[0] < rows
+                and 0 <= neighbor[1] < cols
+                and grid[neighbor[0]][neighbor[1]].etage1 != "obstacle"
+                and grid[neighbor[0]][neighbor[1]].etage1 != "tronc"
+            ):
+                tentative_g_score = g_score[current] + 1
+                if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g_score
+                    f_score[neighbor] = tentative_g_score + heuristic(neighbor, end)
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
+
+    if end not in came_from:
+        return []
+
+    # Reconstruct path
+    path = []
+    current = end
+    while current in came_from:
+        path.append(current)
+        current = came_from[current]
+    path.append(start)
+    return path[::-1]
+
+
+def heuristic(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def connect_points(grid, start, end):
+    path = bresenham(start[0], start[1], end[0], end[1])
+    if not is_obstacle_in_path(grid, path):
+        return path
+
+    # Find detour
+    return find_detour(grid, start, end)
+
+
+def simplify_segment(grid, start, end):
+    # Simplifie un segment entre deux points en retirant les points intermédiaires inutiles.
+    path = bresenham(start[0], start[1], end[0], end[1])
+    if not is_obstacle_in_path(grid, path):
+        return [start, end]
+
+    detour_path = find_detour(grid, start, end)
+    simplified_path = [detour_path[0]]
+    for i in range(2, len(detour_path)):
+        direct_path = bresenham(
+            simplified_path[-1][0],
+            simplified_path[-1][1],
+            detour_path[i][0],
+            detour_path[i][1],
+        )
+        if is_obstacle_in_path(grid, direct_path):
+            simplified_path.append(detour_path[i - 1])
+    simplified_path.append(detour_path[-1])
+    return simplified_path
+
+
+def find_path_through_points(grid, points):
+    full_path = []
+    for i in range(len(points) - 1):
+        segment_path = simplify_segment(grid, points[i], points[i + 1])
+        if not segment_path:
+            return []  # Si un segment est infranchissable, retourner une liste vide
+        if full_path:
+            full_path.extend(segment_path[1:])  # Éviter de dupliquer les points
+        else:
+            full_path.extend(segment_path)
+    return full_path
 
 
 def mTSP():
@@ -478,11 +572,13 @@ def mTSP():
                 trajet.append((i, j))
             if map[i][j].etage1 == "tronc":
                 if j != 0:
-                    indices_dechets.append((i, j - 1))
-                    trajet.append((i, j - 1))
+                    if map[i][j - 1].etage1 != "obstacle":
+                        indices_dechets.append((i, j - 1))
+                        trajet.append((i, j - 1))
                 else:
-                    indices_dechets.append((i, j + 1))
-                    trajet.append((i, j + 1))
+                    if map[i][j + 1].etage1 != "obstacle":
+                        indices_dechets.append((i, j + 1))
+                        trajet.append((i, j + 1))
     if len(indices_dechets) >= 2 and len(indices_robots) >= 1:
         ################################################
         # Building distance matrix
@@ -530,7 +626,7 @@ def mTSP():
         print(f"Trajet : {trajet}")
         for i in range(num_robots):
             print(f"Chemin pour le robot {i+1}:")
-            trajet_par_robot[i + 1] = []
+            trajet_par_robot[i + 1] = [trajet[i]]
             for j in range(num_robots, len(trajet)):
                 if pulp.value(x[(i, j)]) == 1:
                     trajet_par_robot[i + 1].append(trajet[j])
@@ -541,7 +637,7 @@ def mTSP():
             "Distance totale minimale parcourue par tous les robots :",
             pulp.value(prob.objective),
         )
-
+        global trajet_par_robot_tsp
         trajet_par_robot_tsp = copy.deepcopy(trajet_par_robot)
         for robot in trajet_par_robot:
             nodes_matrix = trajet_par_robot[robot]
@@ -558,6 +654,14 @@ def mTSP():
                     trajet_par_robot_tsp[robot][i] = trajet_par_robot[robot][
                         permutation[i]
                     ]
+
+        # On appelle les algorithmes pour recalculer les trajets en prenant en compte les obstacles
+        for robot in trajet_par_robot_tsp:
+            ancien_point = trajet[robot - 1]
+            for point in trajet_par_robot_tsp[robot]:
+                trajet_temp = trajet_par_robot_tsp[robot]
+                trajet_par_robot_tsp[robot] = find_path_through_points(map, trajet_temp)
+
         print(f"\nTrajet final par robot : {trajet_par_robot_tsp}")
 
         # afficher les trajets
@@ -579,6 +683,51 @@ def mTSP():
                 lines.append(line)
                 ancien_point = point
         # resolution du TSP par robot
+
+
+###################################################
+### Import export de cartes
+###################################################
+def open_file_dialog():
+    file_path = filedialog.askopenfilename()
+    import_map(file_path)
+
+
+def export_file_dialog():
+    file_path = filedialog.asksaveasfilename(defaultextension=".txt")
+    if file_path:
+        export_map(map, file_path)
+
+
+def export_map(map, file_path):
+    map_export = [[0 for j in range(taille_carte)] for i in range(taille_carte)]
+    for x in range(taille_carte):
+        for y in range(taille_carte):
+            if map[y][x].etage1 != "void":
+                print(map[y][x].etage1)
+            if map[y][x].etage1 == "obstacle":
+                map_export[y][x] = "obstacle"
+            if map[y][x].etage1 == "trash":
+                map_export[y][x] = "trash"
+            if map[y][x].etage1 == "tronc":
+                map_export[y][x] = "tronc"
+
+    np.savetxt(file_path, map_export, fmt="%s")
+
+
+def import_map(file_path):
+    map_importée = np.loadtxt(file_path, dtype=str)
+    print(map_importée)
+    reset_grid(True)
+    for x in range(taille_carte):
+        for y in range(taille_carte):
+            if map_importée[y][x] == "obstacle":
+                change_to_obstacle(x, y)
+            if map_importée[y][x] == "trash":
+                change_to_trash(x, y)
+            if map_importée[y][x] == "tronc":
+                print("oui c un arbre")
+                change_to_tree(x, y)
 
 
 ###################################################
@@ -619,18 +768,72 @@ def gazebo_delete(type_obj, y=None, x=None):
         print(f"Failed to delete Gazebo model: {e}")
 
 
-def gazebo_deplacer(type_obj, y, x):
-    command = f"cd ~/catkin_ws && source devel/setup.bash && rosservice call gazebo/delete_model '{{model_name: {type_obj}_{x}_{y}}}'"  # noqa: E501
-    try:
-        subprocess.Popen(
-            command,
-            shell=True,
-            executable="/bin/bash",
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception as e:
-        print(f"Failed to delete Gazebo model: {e}")
+sys.path.append(os.path.expanduser("~/catkin_ws/src/pir/packages/gazebo_project/src"))
+
+
+import example_command1 as example_command  # noqa: E402
+
+
+def transform_dict_to_list(d, robot_list):
+    result = []
+    for key, value in d.items():
+        inner_list = []
+        for v in value:
+            inner_list.append(
+                [
+                    -(float(v[0] - taille_carte // 2)),
+                    -(float(v[1] - taille_carte // 2)),
+                    0.0,
+                ]
+            )
+        result.append([robot_list[key - 1], inner_list])
+    return result
+
+
+def gazebo_deplacer(old_waypoints):
+    # Initialiser le noeud ROS
+    example_command.rospy.init_node("listener", anonymous=True)
+    waypoints = transform_dict_to_list(old_waypoints, liste_robots)
+    print(waypoints)
+    # Définir les waypoints pour chaque robot:sous cette forme
+    # waypoints = [
+    #     [
+    #         "intelaero_0",
+    #         [
+    #             [10.0, 10.0, 10.0, 0.0, 0.0, 0.0],
+    #             [-10.0, -10.0, 10.0, 0.0, 0.0, 0.0],
+    #             [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
+    #         ],
+    #     ],
+    #     [
+    #         "intelaero_1",
+    #         [
+    #             [20.0, 20.0, 10.0, 0.0, 0.0, 0.0],
+    #             [-20.0, -20.0, 10.0, 0.0, 0.0, 0.0],
+    #             [0.0, 0.0, 10.0, 0.0, 0.0, 0.0],
+    #         ],
+    #     ],
+    #     [
+    #         "warthog_0",
+    #         [
+    #             [20.0, 20.0, 10.0],
+    #             [-20.0, -20.0, 10.0],
+    #             [0.0, 0.0, 10.0],
+    #         ],
+    #     ],
+    # ]
+
+    # Créer une instance de Algorithm pour chaque robot et démarrer les threads
+    threads = []
+    for robot_name, robot_waypoints in waypoints:
+        algo = example_command.Algorithm(robot_name, robot_waypoints)
+        thread = threading.Thread(target=algo.run)
+        thread.start()
+        threads.append(thread)
+
+    # Attendre que tous les threads soient terminés
+    for thread in threads:
+        thread.join()
 
 
 ###################################################
@@ -817,9 +1020,9 @@ def on_click(event, x, y):  # menu contextuel au clic sur un pixel
         label="Placer un drone", command=partial(change_to_drone, x, y)
     )
     if map[y][x].drone is not None:
-        robot_menu.add_command(
-            label="Déplacer robot", command=partial(animate_drone_move, x, y)
-        )
+        # robot_menu.add_command(
+        #     label="Déplacer robot", command=partial(animate_drone_move, x, y)
+        # )
         robot_menu.add_command(
             label="Retirer drone", command=partial(retirer_drone, x, y)
         )
@@ -874,11 +1077,21 @@ def retirer_drone(x, y):
             )
         elif map[y][x].etage1 != "void":
             draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, f"pixel{x}-{y}")
+        if map[y][x].robot is not None:
+            draw_pixel_robot(
+                canvas,
+                x,
+                y,
+                COLORS["robot"],
+                pixel_size,
+                f"pixel{x}-{y}",
+            )
 
 
 def retirer_robot(x, y):
     if map[y][x].robot is not None:
         map[y][x].robot = None
+        liste_robots.remove(f"warthog_{x}_{y}")
         try:
             gazebo_delete("warthog", x, y)
         except Exception as e:
@@ -896,6 +1109,15 @@ def retirer_robot(x, y):
         if map[y][x].etage2 != "void":
             draw_pixel_feuillage(
                 canvas, x, y, COLORS[map[y][x].etage1], pixel_size, f"pixel{x}-{y}"
+            )
+        if map[y][x].drone is not None:
+            draw_pixel_drone(
+                canvas,
+                x,
+                y,
+                COLORS["drone"],
+                pixel_size,
+                f"pixel{x}-{y}",
             )
 
 
@@ -1234,9 +1456,16 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
     mTSP()
 
 
+global liste_robots
+liste_robots = []
+
+
 def change_to_robot(x, y):  # changement d'un pixel en robot
     change_color(x, y, 3, "robot")
+    if f"warthog_{x}_{y}" not in liste_robots:
+        liste_robots.append(f"warthog_{y}_{x}")
     gazebo("warthog", x, y)
+    print(liste_robots)
     mTSP()
 
 
@@ -1323,10 +1552,16 @@ def filter_objects_by_name(objects_list, name):
     return [obj for obj in objects_list if name in obj]
 
 
-def reset_grid(tout=False):  # réinitialisation de la grille
+def reset_grid(que_environnement=False):  # réinitialisation de la grille
     for y in range(len(map)):
         for x in range(len(map[y])):
             change_to_void(x, y)
+            if not que_environnement:
+                if map[y][x].drone is not None:
+                    retirer_drone(x, y)
+                if map[y][x].robot is not None:
+                    retirer_robot(x, y)
+
     command = "cd ~/catkin_ws && source devel/setup.bash && rosservice call /gazebo/get_world_properties"  # noqa: E501
     try:
         output = subprocess.check_output(command, shell=True, executable="/bin/bash")
@@ -1340,9 +1575,11 @@ def reset_grid(tout=False):  # réinitialisation de la grille
         print(f"Failed to launch Gazebo: {e}")
     filtered_objects = filter_objects_by_name(model_names, "tree")
     filtered_objects += filter_objects_by_name(model_names, "trash")
-    filtered_objects += filter_objects_by_name(model_names, "warthog")
-    filtered_objects += filter_objects_by_name(model_names, "intelaero")
     filtered_objects += filter_objects_by_name(model_names, "obstacle")
+    if not que_environnement:
+        filtered_objects += filter_objects_by_name(model_names, "warthog")
+        filtered_objects += filter_objects_by_name(model_names, "intelaero")
+
     print(filtered_objects)
     for obj in filtered_objects:
         gazebo_delete(obj)
@@ -1383,12 +1620,11 @@ def bouton(
 
 
 root = tk.Tk()
-canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
 
-canvas.grid(row=3, column=0, columnspan=2)  
+canvas = tk.Canvas(root, width=canvas_width, height=canvas_height)
+canvas.grid(row=3, column=0, columnspan=2)  # Use grid here
 
 canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill="white")
-
 
 drones = []
 
@@ -1398,8 +1634,9 @@ for i in range(2):
         end_x = start_x + taille_section - 1
         start_y = j * taille_section
         end_y = start_y + taille_section - 1
-        drone = Drone_courant(start_x, end_x, start_y, end_y, (2 * i + j + 1), canvas)
+        drone = Drone_courant(start_x, end_x, start_y, end_y, (2*i+j+1), canvas)
         drones.append(drone)
+
 
 draw_map(canvas, window_size)
 draw_drones(canvas)
@@ -1416,7 +1653,9 @@ trash_cycle_button.grid(row=2, column=0, sticky="w")
 tree_button = bouton("Afficher matrice dans console", lambda: print_map(map), "blue")
 tree_button.grid(row=0, column=1, sticky="e")
 
-reset_button = bouton("Réinitialiser environnement", reset_grid, "red")
+reset_button = bouton(
+    "Réinitialiser environnement", lambda: reset_grid(True), "#FF8080"
+)
 reset_button.grid(row=1, column=1, sticky="e")
 reset2_button = bouton("Réinitialiser tout", reset_grid, "red")
 reset2_button.grid(row=2, column=1, sticky="e")
@@ -1430,6 +1669,16 @@ pause_button.grid(row=1, column=0,  sticky="e")
 
 stop_button = bouton("Stop and Exit", stop_all_drones_and_exit)
 stop_button.grid(row=2, column=0, sticky="e")
+
+
+open_file_button = bouton("Ouvrir fichier", open_file_dialog, "blue")
+open_file_button.grid(row=4, column=0, columnspan=2, sticky="nsew")
+export_button = bouton("Exporter fichier", export_file_dialog, "blue")
+export_button.grid(row=5, column=0, columnspan=2, sticky="nsew")
+start_button = bouton(
+    "Démarrer", lambda: gazebo_deplacer(trajet_par_robot_tsp), "green"
+)
+start_button.grid(row=6, column=0, columnspan=2, sticky="nsew")
 
 
 
