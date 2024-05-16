@@ -495,11 +495,10 @@ def transform_dict_to_list(d, robot_list):
 
 
 def gazebo_deplacer(old_waypoints):
-    # Initialiser le noeud ROS
     example_command.rospy.init_node("listener", anonymous=True)
     waypoints = transform_dict_to_list(old_waypoints, liste_robots)
     print(waypoints)
-    # Définir les waypoints pour chaque robot:sous cette forme
+    # waypoints pour chaque robot:sous cette forme
     # waypoints = [
     #     [
     #         "intelaero_0",
@@ -527,7 +526,7 @@ def gazebo_deplacer(old_waypoints):
     #     ],
     # ]
 
-    # Créer une instance de Algorithm pour chaque robot et démarrer les threads
+    # Créer une instance de Algorithm pour chaque robot et démarrer les threads ?? Bonne approche?? (pas certain)
     threads = []
     for robot_name, robot_waypoints in waypoints:
         algo = example_command.Algorithm(robot_name, robot_waypoints)
@@ -535,9 +534,15 @@ def gazebo_deplacer(old_waypoints):
         thread.start()
         threads.append(thread)
 
-    # Attendre que tous les threads soient terminés
     for thread in threads:
         thread.join()
+
+
+def deplacer_thread(liste):
+    example_command.rospy.init_node("listener", anonymous=True)
+    t = threading.Thread(target=gazebo_deplacer, args=(liste,))
+
+    t.start()
 
 
 ###################################################
@@ -1348,7 +1353,7 @@ open_file_button.grid(row=4, column=0, columnspan=2, sticky="nsew")
 export_button = bouton("Exporter fichier", export_file_dialog, "blue")
 export_button.grid(row=5, column=0, columnspan=2, sticky="nsew")
 start_button = bouton(
-    "Démarrer", lambda: gazebo_deplacer(trajet_par_robot_tsp), "green"
+    "Démarrer", lambda: deplacer_thread(trajet_par_robot_tsp), "green"
 )
 start_button.grid(row=6, column=0, columnspan=2, sticky="nsew")
 
