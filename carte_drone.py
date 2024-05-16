@@ -212,6 +212,7 @@ class Drone_courant:
                             if (grid_x, grid_y) not in self.trash_found:  
                                 self.trash_found.append((grid_x, grid_y))
                                 print(f"DRONE {self.id} finds trash at position: ({grid_x+1}, {grid_y+1})")
+                                list_trash_global.append((grid_y, grid_x))
                                 
                                 
 
