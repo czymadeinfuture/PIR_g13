@@ -305,7 +305,6 @@ class Drone_courant:
                 self.move_to_target(self.canvas)
                 if self.all_covered():
                     self.min_visit += 1
-                    print(list_trash_global)
                     time.sleep(2)  
                 else:
                     time.sleep(0.2) 
