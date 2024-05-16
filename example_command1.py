@@ -297,10 +297,9 @@ class Algorithm(object):
     # ====================================
     def run(self):
         rate = rospy.Rate(100)
-
+        self.exemple()
         while not rospy.is_shutdown():
             rate.sleep()
-            self.exemple()
 
 
 # ====================================
