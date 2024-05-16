@@ -40,7 +40,7 @@ nb = taille_section//taille_bloc
 
 ##########
 lines = []
-
+list_trash_global=[]
 
 class Cellule:
     def __init__(
@@ -212,10 +212,12 @@ class Drone_courant:
                             if (grid_x, grid_y) not in self.trash_found:  
                                 self.trash_found.append((grid_x, grid_y))
                                 print(f"DRONE {self.id} finds trash at position: ({grid_x+1}, {grid_y+1})")
+                                list_trash_global.append((grid_y, grid_x))
+                                mTSP()
                                 
                                 
 
-    # utiliser algo nc-drone-ts pour décider la position suivante
+    # utiliser qlgo nc-drone-ts pour décider la position suivante
     def start_move(self):
         if not self.moving:
             min_visits = float('inf')
@@ -341,6 +343,7 @@ def init_map_drone(num):
     return map_data,block_counts
 
 map = init_map(taille_carte)
+map_robot = init_map(taille_carte)
 map_data,block_counts = init_map_drone(taille_carte)
 pixel_size = 3 * window_size // len(map)
 
@@ -559,7 +562,7 @@ def mTSP():
         "black",
         "yellow",
     ]
-
+    
     for i in range(taille_carte):
         for j in range(taille_carte):
             if map[i][j].robot is not None:
@@ -567,9 +570,10 @@ def mTSP():
                 trajet.append((i, j))
     for i in range(taille_carte):
         for j in range(taille_carte):
-            if map[i][j].etage1 == "trash":  # Si la cellule contient des déchets
-                indices_dechets.append((i, j))  # Enregistrer l'indice de la cellule
-                trajet.append((i, j))
+            for z in range(len(list_trash_global)):
+                if list_trash_global[z] == (i,j):  # Si la cellule contient des déchets
+                    indices_dechets.append((i, j))  # Enregistrer l'indice de la cellule
+                    trajet.append((i, j))
             if map[i][j].etage1 == "tronc":
                 if j != 0:
                     if map[i][j - 1].etage1 != "obstacle":
@@ -771,7 +775,7 @@ def gazebo_delete(type_obj, y=None, x=None):
 sys.path.append(os.path.expanduser("~/catkin_ws/src/pir/packages/gazebo_project/src"))
 
 
-import example_command1 as example_command  # noqa: E402
+#import example_command1 as example_command  # noqa: E402
 
 
 def transform_dict_to_list(d, robot_list):
@@ -790,7 +794,7 @@ def transform_dict_to_list(d, robot_list):
     return result
 
 
-def gazebo_deplacer(old_waypoints):
+#def gazebo_deplacer(old_waypoints):
     # Initialiser le noeud ROS
     example_command.rospy.init_node("listener", anonymous=True)
     waypoints = transform_dict_to_list(old_waypoints, liste_robots)
@@ -1179,14 +1183,18 @@ def change_color(x, y, etage, element):
     if element == "drone":
         draw_pixel_drone(canvas, x, y, COLORS["drone"], pixel_size, f"pixel{x}-{y}")
         map[y][x].drone = Drone(x, y)
+        map_robot[y][x].drone = Drone(x, y)
     elif element == "robot":
         draw_pixel_robot(canvas, x, y, COLORS["robot"], pixel_size, f"pixel{x}-{y}")
         map[y][x].robot = Robot(x, y)
+        map_robot[y][x].robot = Robot(x, y)
 
     elif map[y][x].etage1 == "tronc" and etage == 1 and element != "tronc":
         gazebo_delete("tree", x, y)
         tag = f"pixel{x}-{y}"
         map[y][x].etage1 = element
+        if element != "trash":
+            map_robot[y][x].etage1 = element
 
         radius = 5
         for i in range(-radius, radius + 1):
@@ -1200,6 +1208,7 @@ def change_color(x, y, etage, element):
                             and map[new_y][new_x].etage1 != "tronc"
                         ):
                             map[new_y][new_x].etage2 = "void"
+                            map_robot[y][x].etage2 = "void"
                             draw_pixel(
                                 canvas,
                                 new_x,
@@ -1232,6 +1241,7 @@ def change_color(x, y, etage, element):
                             and map[new_y][new_x].etage1 == "tronc"
                         ):
                             map[new_y][new_x].etage2 = "feuillage"
+                            map_robot[new_y][new_x].etage2 = "feuillage"
                             draw_pixel_feuillage(
                                 canvas,
                                 new_x,
@@ -1260,6 +1270,7 @@ def change_color(x, y, etage, element):
                                 )
                         else:
                             map[new_y][new_x].etage2 = "void"
+                            map_robot[new_y][new_x].etage2 = "void"
                             draw_pixel(
                                 canvas,
                                 new_x,
@@ -1295,6 +1306,7 @@ def change_color(x, y, etage, element):
         and element != "drone"
     ):
         map[y][x].etage2 = element
+        map_robot[y][x].etage2 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
         if map[y][x].drone is not None:
@@ -1321,6 +1333,8 @@ def change_color(x, y, etage, element):
 
     elif map[y][x].etage1 == "void" and map[y][x].etage2 == "void" and etage == 1:
         map[y][x].etage1 = element
+        if element != "trash":
+            map_robot[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS[element], pixel_size, tag)
         if map[y][x].drone is not None:
@@ -1344,6 +1358,8 @@ def change_color(x, y, etage, element):
 
     elif map[y][x].etage2 != "void" and etage == 1 and element != "void":
         map[y][x].etage1 = element
+        if element != "trash":
+            map_robot[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel_feuillage(canvas, x, y, COLORS[element], pixel_size, tag)
         if map[y][x].drone is not None:
@@ -1367,6 +1383,8 @@ def change_color(x, y, etage, element):
 
     elif map[y][x].etage1 != "void" and etage == 2:
         map[y][x].etage2 = element
+        if element != "trash":
+            map_robot[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
 
         draw_pixel_feuillage(canvas, x, y, COLORS[map[y][x].etage1], pixel_size, tag)
@@ -1395,6 +1413,8 @@ def change_color(x, y, etage, element):
         if map[y][x].etage1 == "obstacle":
             gazebo_delete("obstacle", x, y)
         map[y][x].etage1 = element
+        if element != "trash":
+            map_robot[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["feuillage"], pixel_size, tag)
 
@@ -1423,6 +1443,8 @@ def change_color(x, y, etage, element):
         if map[y][x].etage1 == "obstacle":
             gazebo_delete("obstacle", x, y)
         map[y][x].etage1 = element
+        if element != "trash":
+            map_robot[y][x].etage1 = element
         tag = f"pixel{x}-{y}"
         draw_pixel(canvas, x, y, COLORS["void"], pixel_size, tag)
         if map[y][x].drone is not None:
@@ -1453,7 +1475,7 @@ def change_to_trash(x, y):  # changement d'un pixel en déchet
     change_color(x, y, 1, "trash")
     global number_trash
     gazebo("trash", x, y)
-    mTSP()
+    
 
 
 global liste_robots
@@ -1675,10 +1697,10 @@ open_file_button = bouton("Ouvrir fichier", open_file_dialog, "blue")
 open_file_button.grid(row=4, column=0, columnspan=2, sticky="nsew")
 export_button = bouton("Exporter fichier", export_file_dialog, "blue")
 export_button.grid(row=5, column=0, columnspan=2, sticky="nsew")
-start_button = bouton(
-    "Démarrer", lambda: gazebo_deplacer(trajet_par_robot_tsp), "green"
-)
-start_button.grid(row=6, column=0, columnspan=2, sticky="nsew")
+#start_button = bouton(
+    #"Démarrer", lambda: gazebo_deplacer(trajet_par_robot_tsp), "green"
+#)
+#start_button.grid(row=6, column=0, columnspan=2, sticky="nsew")
 
 
 

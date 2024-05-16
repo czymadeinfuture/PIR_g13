@@ -12,7 +12,6 @@ import math
 import numpy as np
 import os, time
 import tf
-import rospy
 import matplotlib.pyplot as plt
 from test import *
 import sys
