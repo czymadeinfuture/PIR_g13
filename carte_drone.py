@@ -212,8 +212,6 @@ class Drone_courant:
                             if (grid_x, grid_y) not in self.trash_found:  
                                 self.trash_found.append((grid_x, grid_y))
                                 print(f"DRONE {self.id} finds trash at position: ({grid_x+1}, {grid_y+1})")
-                                list_trash_global.append((grid_y, grid_x))
-                                mTSP()
                                 
                                 
 
@@ -306,6 +304,7 @@ class Drone_courant:
                 self.move_to_target(self.canvas)
                 if self.all_covered():
                     self.min_visit += 1
+                    print(list_trash_global)
                     time.sleep(2)  
                 else:
                     time.sleep(0.2) 
